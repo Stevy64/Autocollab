@@ -42,6 +42,23 @@
           <span id="tendance-detail">Libreville</span>
         </span>
       </button>
+      <div class="search" id="search">
+        <button type="button" class="icon-btn" id="search-toggle" aria-expanded="false" aria-controls="search-field" aria-label="Rechercher un quartier ou un lieu">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M15.8 15.8 20 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <form class="search-field" id="search-field" role="search" hidden>
+          <input id="search-input" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Quartier, zone ou lieu" aria-label="Quartier, zone ou lieu" aria-controls="search-results" aria-autocomplete="list">
+          <button type="button" class="search-close" id="search-close" aria-label="Fermer la recherche">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </form>
+        <ul class="search-results" id="search-results" role="listbox" hidden></ul>
+      </div>
       <button type="button" class="icon-btn" id="recenter" aria-label="Recentrer la carte sur Libreville">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8"/>

@@ -75,7 +75,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .skip:focus { transform: none; }
 
 #app { position: relative; height: 100%; }
-#map { position: absolute; inset: 0; }
+#map { position: absolute; inset: 0; z-index: 1; }
 
 .leaflet-container {
   background: #d5dbe3;
@@ -102,26 +102,30 @@ button { -webkit-tap-highlight-color: transparent; }
   max-width: min(70vw, 280px);
 }
 .leaflet-bottom.leaflet-left {
-  bottom: min(calc(var(--sheet-visible) + 8px), 52vh);
+  bottom: calc(var(--sheet-visible) + 8px);
   left: 8px;
 }
 .leaflet-bottom.leaflet-right {
-  bottom: min(calc(var(--sheet-visible) + 12px), 52vh);
+  bottom: calc(var(--sheet-visible) + 12px);
   right: 12px;
+}
+body.sheet-covers .leaflet-bottom {
+  opacity: 0;
+  pointer-events: none;
 }
 body.is-picking .leaflet-container { cursor: crosshair; }
 
 .topbar {
   position: absolute;
-  z-index: 600;
+  z-index: 6;
   top: max(12px, env(safe-area-inset-top));
   left: 12px;
   right: 12px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   grid-template-areas:
-    "brand recenter"
-    "tendance tendance";
+    "brand search recenter"
+    "tendance tendance tendance";
   gap: 8px;
   pointer-events: none;
 }
@@ -175,6 +179,89 @@ body.is-picking .leaflet-container { cursor: crosshair; }
   place-items: center;
   cursor: pointer;
 }
+.search {
+  position: relative;
+  grid-area: search;
+  width: 48px;
+  height: 48px;
+}
+.search-toggle { grid-area: auto; }
+.search-field {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  width: min(300px, calc(100vw - 24px));
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 14px;
+  background: var(--paper);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  color: inherit;
+}
+.search-field input:focus { outline: none; }
+.search-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #141414;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+}
+.search-results {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  z-index: 2;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(46vh, 320px);
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow: auto;
+  background: var(--paper);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+.search-hit {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.search-hit:hover, .search-hit:focus-visible { background: #f6f7f8; }
+.search-hit strong { font-size: 14px; letter-spacing: -0.02em; }
+.search-hit span { color: var(--muted); font-size: 12px; }
+.search-empty {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
 .tendance {
   grid-area: tendance;
   min-width: 0;
@@ -216,7 +303,7 @@ body.is-picking .leaflet-container { cursor: crosshair; }
 
 .pick-banner {
   position: absolute;
-  z-index: 650;
+  z-index: 7;
   top: 158px;
   left: 50%;
   transform: translateX(-50%);
@@ -251,7 +338,7 @@ body.is-picking .leaflet-container { cursor: crosshair; }
 
 .sheet {
   position: absolute;
-  z-index: 500;
+  z-index: 5;
   left: 0;
   right: 0;
   bottom: 0;
@@ -303,6 +390,16 @@ body.sheet-dragging .sheet { transition: none; }
 }
 .sheet-head h1 { font-size: 20px; }
 .sheet-head p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+.sheet-place button {
+  border: 0;
+  background: transparent;
+  color: #141414;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
 .desktop-only { display: none; }
 
@@ -531,7 +628,7 @@ textarea.field { min-height: 96px; resize: vertical; line-height: 1.4; }
 
 .toast {
   position: absolute;
-  z-index: 800;
+  z-index: 8;
   left: 50%;
   top: 214px;
   transform: translateX(-50%);
@@ -547,7 +644,7 @@ textarea.field { min-height: 96px; resize: vertical; line-height: 1.4; }
 }
 .noscript {
   position: absolute;
-  z-index: 900;
+  z-index: 9;
   left: 12px;
   right: 12px;
   bottom: 12px;
@@ -626,8 +723,8 @@ textarea.field { min-height: 96px; resize: vertical; line-height: 1.4; }
   .topbar {
     left: calc(var(--panel) + 28px);
     right: 16px;
-    grid-template-columns: auto minmax(0, 460px) auto;
-    grid-template-areas: "brand tendance recenter";
+    grid-template-columns: auto minmax(0, 460px) auto auto;
+    grid-template-areas: "brand tendance search recenter";
     align-items: center;
   }
   .leaflet-bottom.leaflet-left {

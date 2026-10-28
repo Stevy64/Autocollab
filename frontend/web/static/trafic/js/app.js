@@ -55,6 +55,8 @@ const state = {
   errors: {},
   draft: emptyDraft(),
   markerKey: "",
+  place: null,
+  searchOpen: false,
 };
 
 function esc(value) {
@@ -97,9 +99,8 @@ function homeZoom() {
 }
 
 function appuisCourt(n) {
-  if (n === 0) return "Aucun appui";
-  if (n === 1) return "1 appui";
-  return `${n} appuis`;
+  if (!n) return "pas confirmé";
+  return `${n}×`;
 }
 
 function appuisPhrase(n) {
@@ -167,15 +168,24 @@ function visiblePx() {
   return window.innerHeight * 0.46;
 }
 
+function sheetCeiling() {
+  if (isDesktop()) return Math.round(window.innerHeight - 32);
+  const top = document.querySelector(".topbar");
+  const reserve = top ? Math.ceil(top.getBoundingClientRect().bottom) + 10 : 132;
+  return Math.max(220, window.innerHeight - reserve);
+}
+
 function setVisible(px) {
-  const max = Math.round(window.innerHeight * 0.92);
-  const next = Math.max(96, Math.min(max, Math.round(px)));
+  const next = Math.max(96, Math.min(sheetCeiling(), Math.round(px)));
   document.documentElement.style.setProperty("--sheet-visible", `${next}px`);
+  const top = document.querySelector(".topbar");
+  const needed = top ? Math.ceil(top.getBoundingClientRect().bottom) + 64 : 180;
+  document.body.classList.toggle("sheet-covers", !isDesktop() && window.innerHeight - next < needed);
 }
 
 function snapPoints() {
   const height = window.innerHeight;
-  return [108, Math.round(height * 0.46), Math.round(height * 0.88)];
+  return [108, Math.round(height * 0.46), sheetCeiling()];
 }
 
 function snapTo(px) {
@@ -222,6 +232,21 @@ function haversine(lat1, lng1, lat2, lng2) {
   return 2 * earth * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
+function fold(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function reportMatchesPlace(report, place) {
+  if (!place) return true;
+  const name = fold(place.nom);
+  if (name && fold(report.lieu).includes(name)) return true;
+  if (report.latitude == null || place.latitude == null) return false;
+  return haversine(report.latitude, report.longitude, place.latitude, place.longitude) <= 1.2;
+}
+
 function nearestLieu(latitude, longitude) {
   let best = null;
   let bestKm = 1.4;
@@ -236,8 +261,10 @@ function nearestLieu(latitude, longitude) {
 }
 
 function visibleReports() {
-  if (state.filter === "tous") return state.reports;
-  return state.reports.filter((report) => report.type === state.filter);
+  return state.reports.filter((report) => {
+    if (state.filter !== "tous" && report.type !== state.filter) return false;
+    return reportMatchesPlace(report, state.place);
+  });
 }
 
 function selected() {
@@ -316,7 +343,8 @@ function markerHtml(report) {
 function syncMarkers() {
   if (!markerLayer) return;
   const reports = visibleReports();
-  const key = `${state.selectedId}|${reports.map((report) => `${report.id}:${report.appuis}:${report.commentaires[0] ? report.commentaires[0].id : 0}`).join(",")}`;
+  const placeKey = state.place ? state.place.nom : "";
+  const key = `${state.selectedId}|${placeKey}|${reports.map((report) => `${report.id}:${report.appuis}:${report.commentaires[0] ? report.commentaires[0].id : 0}`).join(",")}`;
   if (key === state.markerKey) return;
   state.markerKey = key;
   markerLayer.clearLayers();
@@ -406,6 +434,15 @@ function itemHtml(report) {
 }
 
 function emptyHtml() {
+  const atPlace = state.place
+    ? state.reports.some((report) => reportMatchesPlace(report, state.place))
+    : false;
+  if (state.place && state.filter !== "tous" && atPlace) {
+    return `<div class="state"><h2>Rien pour ce filtre</h2><p>Aucun signalement de ce type vers ${esc(state.place.nom)}.</p></div>`;
+  }
+  if (state.place) {
+    return `<div class="state"><h2>Rien vers ${esc(state.place.nom)}</h2><p>Aucun signalement pour ce lieu en ce moment.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Voir tout Libreville</button></div>`;
+  }
   if (state.filter !== "tous") {
     return `<div class="state"><h2>Rien pour ce filtre</h2><p>Aucun signalement de ce type pour le moment. Essayez un autre filtre, ou publiez ce que vous voyez sur la route.</p></div>`;
   }
@@ -414,14 +451,18 @@ function emptyHtml() {
 
 function renderFeed() {
   const items = visibleReports();
-  const subtitle = state.reports.length
-    ? `Dernier signalement ${state.reports[0].relatif}`
-    : "Libreville";
+  const subtitle = state.place
+    ? `Vers ${state.place.nom}`
+    : (state.reports.length ? `Dernier signalement ${state.reports[0].relatif}` : "Libreville");
+  const placeNote = state.place
+    ? `<p class="sheet-place"><button type="button" data-action="clear-place">Tout Libreville</button></p>`
+    : "";
   return `
     <div class="sheet-head">
       <div>
         <h1>En ce moment</h1>
         <p>${esc(subtitle)}</p>
+        ${placeNote}
       </div>
       <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
     </div>
@@ -471,9 +512,9 @@ function renderDetail() {
       </div>
       <h2>${esc(report.lieu)}</h2>
       <p class="detail-text">${esc(report.commentaire)}</p>
-      <button type="button" class="appui${report.appuye ? " is-on" : ""}" data-action="appui" data-id="${report.id}" aria-pressed="${report.appuye ? "true" : "false"}">
-        <span>${report.appuye ? "Appuyé" : "Appuyer"}</span>
-        <span class="appui-count">${report.appuis}</span>
+      <button type="button" class="appui${report.appuye ? " is-on" : ""}" data-action="appui" data-id="${report.id}" aria-pressed="${report.appuye ? "true" : "false"}" aria-label="${report.appuye ? "Confirmé" : "Confirmer"} ${report.appuis} fois">
+        <span>${report.appuye ? "Confirmé" : "Confirmer"}</span>
+        <span class="appui-count">${report.appuis}×</span>
       </button>
       <p class="appui-hint">${esc(appuisPhrase(report.appuis))}</p>
       <section class="notes" aria-label="Précisions">
@@ -547,6 +588,7 @@ function render() {
   document.body.classList.toggle("is-compose", state.mode === "compose");
   const banner = document.getElementById("pick-banner");
   if (banner) banner.hidden = !state.picking;
+  if (state.searchOpen) renderSearchResults();
 }
 
 function showCompose() {
@@ -706,7 +748,7 @@ async function publish(event) {
 async function support(id) {
   const current = state.reports.find((item) => item.id === id);
   if (!current || current.appuye) {
-    toast("Vous appuyez déjà ce signalement.");
+    toast("Vous avez déjà confirmé ce signalement.");
     return;
   }
   try {
@@ -714,7 +756,7 @@ async function support(id) {
     upsert(data.signalement);
     render();
   } catch (error) {
-    toast(messageFrom(error, "L'appui n'a pas pu être enregistré."));
+    toast(messageFrom(error, "La confirmation n'a pas pu être enregistrée."));
   }
 }
 
@@ -805,6 +847,89 @@ function applyHashOnce() {
   if (state.reports.some((report) => report.id === id)) selectReport(id);
 }
 
+function clearPlace() {
+  state.place = null;
+  state.markerKey = "";
+  if (map) map.flyTo([boot.centre.latitude, boot.centre.longitude], homeZoom(), { duration: motion() });
+  render();
+}
+
+function searchHits(query) {
+  const q = fold(query.trim());
+  const lieux = boot.lieux.filter((lieu) => !q || fold(lieu.nom).includes(q));
+  const places = (q ? lieux : lieux.slice(0, 6)).slice(0, 6);
+  const reports = q
+    ? state.reports.filter((report) => fold(report.lieu).includes(q)).slice(0, 6)
+    : [];
+  return { places, reports, query: q };
+}
+
+function renderSearchResults() {
+  const list = document.getElementById("search-results");
+  if (!list) return;
+  if (!state.searchOpen) {
+    list.hidden = true;
+    return;
+  }
+  const input = document.getElementById("search-input");
+  const { places, reports, query } = searchHits(input ? input.value : "");
+  const placeHtml = places.map((lieu) => {
+    const count = state.reports.filter((report) => reportMatchesPlace(report, lieu)).length;
+    const meta = count ? `${count} signalement${count > 1 ? "s" : ""}` : "Aucun signalement";
+    return `<li><button type="button" class="search-hit" role="option" data-kind="lieu" data-id="${esc(lieu.id)}"><strong>${esc(lieu.nom)}</strong><span>${meta}</span></button></li>`;
+  }).join("");
+  const reportHtml = reports.map((report) => (
+    `<li><button type="button" class="search-hit" role="option" data-kind="report" data-id="${report.id}"><strong>${esc(report.lieu)}</strong><span>${esc(report.type_label)} · ${esc(report.relatif)} · ${report.appuis}×</span></button></li>`
+  )).join("");
+  if (!placeHtml && !reportHtml) {
+    list.innerHTML = `<li class="search-empty">${query ? "Aucun lieu pour cette recherche." : "Tapez un quartier ou un lieu."}</li>`;
+  } else {
+    list.innerHTML = placeHtml + reportHtml;
+  }
+  list.hidden = false;
+}
+
+function setSearchOpen(open) {
+  state.searchOpen = open;
+  const root = document.getElementById("search");
+  const field = document.getElementById("search-field");
+  const toggle = document.getElementById("search-toggle");
+  root.classList.toggle("is-open", open);
+  field.hidden = !open;
+  toggle.hidden = open;
+  toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  if (!open) {
+    document.getElementById("search-results").hidden = true;
+    return;
+  }
+  document.getElementById("search-input").focus();
+  renderSearchResults();
+}
+
+function chooseSearchPlace(id) {
+  const lieu = boot.lieux.find((item) => item.id === id);
+  if (!lieu) return;
+  state.place = { nom: lieu.nom, latitude: lieu.latitude, longitude: lieu.longitude };
+  state.mode = "feed";
+  state.selectedId = null;
+  state.filter = "tous";
+  state.markerKey = "";
+  state.returnMode = "feed";
+  history.replaceState(null, "", `${location.pathname}${location.search}`);
+  setSearchOpen(false);
+  if (!isDesktop()) setVisible(Math.min(snapPoints()[1], sheetCeiling()));
+  if (map) map.flyTo([lieu.latitude, lieu.longitude], 15, { duration: motion() });
+  render();
+  const found = visibleReports();
+  if (!found.length) toast(`Aucun signalement vers ${lieu.nom}.`);
+  else if (found.length === 1) selectReport(found[0].id);
+}
+
+function chooseSearchReport(id) {
+  setSearchOpen(false);
+  selectReport(id);
+}
+
 function onSheetClick(event) {
   const el = event.target.closest("[data-action]");
   if (!el) return;
@@ -817,6 +942,7 @@ function onSheetClick(event) {
   else if (action === "pick") startPick();
   else if (action === "appui") support(Number(el.dataset.id));
   else if (action === "retry") reload();
+  else if (action === "clear-place") clearPlace();
 }
 
 function onSubmit(event) {
@@ -870,7 +996,29 @@ function bind() {
   sheet.addEventListener("change", onChange);
   sheet.addEventListener("input", onInput);
   document.getElementById("recenter").addEventListener("click", () => {
+    state.place = null;
+    state.markerKey = "";
     map.flyTo([boot.centre.latitude, boot.centre.longitude], homeZoom(), { duration: motion() });
+    render();
+  });
+  document.getElementById("search-toggle").addEventListener("click", () => setSearchOpen(true));
+  document.getElementById("search-close").addEventListener("click", () => setSearchOpen(false));
+  document.getElementById("search-field").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const { places, reports } = searchHits(document.getElementById("search-input").value);
+    if (places.length) chooseSearchPlace(places[0].id);
+    else if (reports.length) chooseSearchReport(reports[0].id);
+  });
+  document.getElementById("search-input").addEventListener("input", renderSearchResults);
+  document.getElementById("search-results").addEventListener("click", (event) => {
+    const hit = event.target.closest(".search-hit");
+    if (!hit) return;
+    if (hit.dataset.kind === "lieu") chooseSearchPlace(hit.dataset.id);
+    else chooseSearchReport(Number(hit.dataset.id));
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!state.searchOpen || event.target.closest("#search")) return;
+    setSearchOpen(false);
   });
   document.getElementById("tendance").addEventListener("click", () => {
     if (state.tendance && state.tendance.focus_id) selectReport(state.tendance.focus_id);
@@ -882,6 +1030,10 @@ function bind() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (state.searchOpen) {
+      setSearchOpen(false);
+      return;
+    }
     if (state.picking) {
       state.picking = false;
       if (!isDesktop()) setVisible(snapPoints()[2]);
@@ -903,6 +1055,7 @@ function start() {
   boot = JSON.parse(document.getElementById("boot-data").textContent);
   initMap();
   bind();
+  if (!isDesktop()) setVisible(visiblePx());
   reload();
   window.setInterval(quietRefresh, 45000);
   if ("serviceWorker" in navigator) {
