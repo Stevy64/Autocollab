@@ -111,6 +111,13 @@ class MapSliceTests(TestCase):
         self.assertNotIn("dev-only-wayize", journal)
         self.assertNotIn(payload()["commentaire"], journal)
 
+        libre = self.post_json(
+            "/api/signalements/",
+            payload(lieu="Okala", commentaire="Bouchon vers un quartier saisi à la main."),
+        )
+        self.assertEqual(libre.status_code, 201, libre.content)
+        self.assertEqual(libre.json()["signalement"]["lieu"], "Okala")
+
         missing = self.post_json("/api/signalements/", payload(commentaire="court"))
         self.assertEqual(missing.status_code, 400)
         self.assertIn("commentaire", missing.json()["erreurs"])

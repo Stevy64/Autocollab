@@ -132,6 +132,8 @@ class WebSliceTests(SimpleTestCase):
         self.assertIn("tendance-panel", script)
         self.assertIn("usagers confirment", script)
         self.assertIn("C'est dégagé", script)
+        self.assertIn("lieu-saisie", script)
+        self.assertIn("lieux-connus", script)
         self.assertIn('uiIcon("alarm")', script)
         self.assertNotIn("conducteurs confirment", script)
         self.assertNotIn("${n}×", script)

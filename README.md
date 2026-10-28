@@ -82,7 +82,7 @@ L’en-tête de réponse `X-Request-Id` est le même des deux côtés, ce qui re
 ## Cette version
 
 - Carte centrée sur Libreville, fond OpenStreetMap.
-- Signalement manuel : type, phrase courte, quartier connu ou point posé sur la carte.
+- Signalement manuel : type, phrase courte, quartier de la liste ou nom saisi, avec un point sur la carte si le nom est nouveau.
 - Confirmation, que l'on peut retirer, et précisions courtes, avec les compteurs.
 - Liste des signalements récents, qui recentre la carte. Un signalement disparaît au bout de trois heures. Deux usagers qui disent « c'est dégagé » le retirent tout de suite ; un seul vote reste visible.
 - Tendance des trois dernières heures, en cercle, qui se déploie en barre.

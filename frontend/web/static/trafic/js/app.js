@@ -866,14 +866,14 @@ function renderCompose() {
         <span>${state.errors.commentaire ? `<span class="field-error">${esc(state.errors.commentaire)}</span>` : "Une phrase suffit. Pas de nom, pas de numéro."}</span>
         <span id="commentaire-count">${text.trim().length}/280</span>
       </div>
-      <label class="field-label" for="lieu-select">${uiIcon("pin", 14)} Lieu approximatif</label>
-      <select id="lieu-select" class="field${state.errors.lieu ? " is-invalid" : ""}">
-        <option value="">Choisir un quartier connu</option>
-        ${boot.lieux.map((lieu) => `<option value="${lieu.id}"${state.draft.lieuId === lieu.id ? " selected" : ""}>${esc(lieu.nom)}</option>`).join("")}
-      </select>
+      <label class="field-label" for="lieu-saisie">${uiIcon("pin", 14)} Lieu approximatif</label>
+      <input id="lieu-saisie" class="field${state.errors.lieu ? " is-invalid" : ""}" list="lieux-connus" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Quartier de la liste, ou le vôtre" value="${esc(state.draft.lieu)}">
+      <datalist id="lieux-connus">
+        ${boot.lieux.map((lieu) => `<option value="${esc(lieu.nom)}"></option>`).join("")}
+      </datalist>
       <button type="button" class="btn btn-ghost btn-block pick-btn" data-action="pick">${uiIcon("pin")} Choisir sur la carte</button>
-      <p class="chosen${state.draft.latitude != null ? " is-set" : ""}">${state.draft.latitude != null ? esc(state.draft.lieu) : "Ou touchez la carte pour placer le point."}</p>
-      ${state.errors.lieu ? `<p class="field-error">${esc(state.errors.lieu)}</p>` : ""}
+      <p class="chosen${state.draft.latitude != null ? " is-set" : ""}">${esc(lieuAide())}</p>
+      ${state.errors.lieu ? `<p class="field-error" id="lieu-erreur">${esc(state.errors.lieu)}</p>` : ""}
       <button class="btn btn-primary btn-block" type="submit" ${state.saving ? "disabled" : ""}>${uiIcon("send")} ${state.saving ? "Publication…" : "Publier le signalement"}</button>
     </form>`;
 }
@@ -1121,23 +1121,58 @@ function setType(type) {
   render();
 }
 
-function chooseLieu(id) {
-  const lieu = boot.lieux.find((item) => item.id === id);
-  if (!lieu) {
-    state.draft.lieuId = "";
-    state.draft.lieu = "";
+function lieuConnu(nom) {
+  const cle = fold(String(nom || "").trim());
+  if (!cle) return null;
+  return boot.lieux.find((lieu) => fold(lieu.nom) === cle) || null;
+}
+
+function nomPoseALaMain() {
+  const nom = (state.draft.lieu || "").trim();
+  if (!nom || state.draft.lieuId) return false;
+  if (nom === "Point choisi sur la carte" || nom.startsWith("Près de ")) return false;
+  return true;
+}
+
+function lieuAide() {
+  const nom = (state.draft.lieu || "").trim();
+  if (state.draft.latitude != null && nom) return "Point placé à Libreville.";
+  if (nom) return "Ce quartier n'est pas dans la liste. Touchez la carte pour le placer.";
+  return "Un nom de la liste, ou le vôtre.";
+}
+
+function appliquerLieuSaisi(valeur) {
+  const nom = String(valeur || "").replace(/\s+/g, " ").trim();
+  const connu = lieuConnu(nom);
+  if (connu) {
+    state.draft.lieuId = connu.id;
+    state.draft.lieu = connu.nom;
+    state.draft.latitude = connu.latitude;
+    state.draft.longitude = connu.longitude;
+    delete state.errors.lieu;
+    return connu;
+  }
+  const venaitDuneListe = Boolean(state.draft.lieuId);
+  state.draft.lieu = nom;
+  state.draft.lieuId = "";
+  if (venaitDuneListe) {
     state.draft.latitude = null;
     state.draft.longitude = null;
-    render();
-    return;
   }
-  state.draft.lieuId = lieu.id;
-  state.draft.lieu = lieu.nom;
-  state.draft.latitude = lieu.latitude;
-  state.draft.longitude = lieu.longitude;
-  delete state.errors.lieu;
-  render();
-  map.flyTo([lieu.latitude, lieu.longitude], Math.max(map.getZoom(), 15), { duration: motion() });
+  return null;
+}
+
+function afficherAideLieu() {
+  const aide = document.querySelector(".chosen");
+  if (!aide) return;
+  aide.textContent = lieuAide();
+  aide.classList.toggle("is-set", state.draft.latitude != null);
+  if (state.draft.latitude != null) {
+    const erreur = document.getElementById("lieu-erreur");
+    if (erreur) erreur.remove();
+    const champ = document.getElementById("lieu-saisie");
+    if (champ) champ.classList.remove("is-invalid");
+  }
 }
 
 function startPick() {
@@ -1152,10 +1187,13 @@ function setPickedPoint(latlng) {
     return;
   }
   const near = nearestLieu(latlng.lat, latlng.lng);
+  const garderNom = nomPoseALaMain();
   state.draft.latitude = latlng.lat;
   state.draft.longitude = latlng.lng;
-  state.draft.lieuId = "";
-  state.draft.lieu = near ? `Près de ${near.nom}` : "Point choisi sur la carte";
+  if (!garderNom) {
+    state.draft.lieuId = "";
+    state.draft.lieu = near ? `Près de ${near.nom}` : "Point choisi sur la carte";
+  }
   state.picking = false;
   delete state.errors.lieu;
   if (!isDesktop()) setVisible(snapPoints()[2]);
@@ -1169,11 +1207,11 @@ function validate() {
   if (!state.draft.type) errors.type = "Choisissez le type d'incident.";
   if (text.length < 8) errors.commentaire = "Décrivez la situation en au moins 8 caractères.";
   else if (text.length > 280) errors.commentaire = "280 caractères maximum.";
-  if (state.draft.latitude == null || !state.draft.lieu) {
-    errors.lieu = "Indiquez un quartier connu ou un point sur la carte.";
-  } else if (!inside(state.draft.latitude, state.draft.longitude)) {
-    errors.lieu = "Ce point est en dehors du Grand Libreville.";
-  }
+  const nomLieuSaisi = (state.draft.lieu || "").trim();
+  if (nomLieuSaisi.length < 2) errors.lieu = "Indiquez le nom du quartier.";
+  else if (nomLieuSaisi.length > 120) errors.lieu = "120 caractères maximum.";
+  else if (state.draft.latitude == null) errors.lieu = "Ce quartier n'est pas dans la liste. Touchez la carte pour le placer.";
+  else if (!inside(state.draft.latitude, state.draft.longitude)) errors.lieu = "Ce point est en dehors du Grand Libreville.";
   return errors;
 }
 
@@ -1727,7 +1765,12 @@ function onSubmit(event) {
 }
 
 function onChange(event) {
-  if (event.target.id === "lieu-select") chooseLieu(event.target.value);
+  if (event.target.id === "lieu-saisie") {
+    const connu = appliquerLieuSaisi(event.target.value);
+    if (connu && event.target.value !== connu.nom) event.target.value = connu.nom;
+    afficherAideLieu();
+    if (connu && map) map.flyTo([connu.latitude, connu.longitude], Math.max(map.getZoom(), 15), { duration: motion() });
+  }
   if (event.target.dataset.reglage) changerReglage(event.target.dataset.reglage, event.target.checked);
   if (event.target.dataset.heure) {
     assurerReglages()[event.target.dataset.heure] = event.target.value;
@@ -1742,6 +1785,10 @@ function onInput(event) {
     if (counter) counter.textContent = `${event.target.value.trim().length}/280`;
   }
   if (event.target.id === "detail-commentaire") state.detailDraft = event.target.value;
+  if (event.target.id === "lieu-saisie") {
+    appliquerLieuSaisi(event.target.value);
+    afficherAideLieu();
+  }
 }
 
 function bindGrabber() {

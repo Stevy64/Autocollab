@@ -165,7 +165,7 @@ def creer(request):
     latitude = nombre(data.get("latitude"))
     longitude = nombre(data.get("longitude"))
     if not lieu or latitude is None or longitude is None:
-        champs["lieu"] = "Indiquez un quartier connu ou un point sur la carte."
+        champs["lieu"] = "Indiquez le quartier et un point dans le Grand Libreville."
     elif not dans_libreville(latitude, longitude):
         champs["lieu"] = "Ce point est en dehors du Grand Libreville."
     elif len(lieu) > 120:
