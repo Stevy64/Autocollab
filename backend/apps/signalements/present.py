@@ -93,7 +93,7 @@ def commentaire_public(commentaire):
     }
 
 
-def signalement_public(signalement, appuye):
+def signalement_public(signalement, appuye, degage=False):
     notes = getattr(signalement, "notes_recentes", None)
     if notes is None:
         notes = list(signalement.commentaires.all()[:30])
@@ -102,6 +102,9 @@ def signalement_public(signalement, appuye):
     appuis = getattr(signalement, "appui_count", None)
     if appuis is None:
         appuis = signalement.appuis.count()
+    degages = getattr(signalement, "degage_count", None)
+    if degages is None:
+        degages = signalement.degages.count()
     return {
         "id": signalement.id,
         "type": signalement.type,
@@ -112,6 +115,8 @@ def signalement_public(signalement, appuye):
         "longitude": signalement.longitude,
         "appuis": appuis,
         "appuye": appuye,
+        "degages": degages,
+        "degage": degage,
         "commentaires": [commentaire_public(note) for note in notes],
         "cree_le": signalement.cree_le.isoformat(),
         "relatif": relatif(signalement.cree_le),

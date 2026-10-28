@@ -95,6 +95,8 @@ const UI = {
   send: '<path d="M4.5 12 19 5.5l-5.6 13.2-2.2-5.6L4.5 12z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   pin: '<path d="M12 20.5s-5.2-4.8-5.2-9.2a5.2 5.2 0 0 1 10.4 0c0 4.4-5.2 9.2-5.2 9.2z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="11.2" r="1.7" fill="currentColor"/>',
   bell: '<path d="M6.2 16.5h11.6M12 4.2a4.6 4.6 0 0 1 4.6 4.6c0 3.2.8 4.4 1.4 5.2H6c.6-.8 1.4-2 1.4-5.2A4.6 4.6 0 0 1 12 4.2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10.2 17.2a1.8 1.8 0 0 0 3.6 0" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  alarm: '<path d="M6.2 16.5h11.6M12 4.2a4.6 4.6 0 0 1 4.6 4.6c0 3.2.8 4.4 1.4 5.2H6c.6-.8 1.4-2 1.4-5.2A4.6 4.6 0 0 1 12 4.2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10.2 17.2a1.8 1.8 0 0 0 3.6 0" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M19.2 5.2 21 3.6M4.8 5.2 3 3.6M12 2.2v1.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  clear: '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 12.2 10.8 14.8 15.8 9.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
   volume: '<path d="M5 10h2.4L11 6.8v10.4L7.4 14H5v-4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14.2 9.2a3.2 3.2 0 0 1 0 5.6M16.4 7.2a6 6 0 0 1 0 9.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
   locate: '<circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3.5v2.4M12 18.1v2.4M3.5 12h2.4M18.1 12h2.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
   clock: '<circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 8.2V12l2.5 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
@@ -184,9 +186,9 @@ function appuisCourt(n) {
 }
 
 function appuisPhrase(n) {
-  if (n === 0) return "Aucun conducteur n'a encore confirmé.";
-  if (n === 1) return "1 conducteur confirme ce signalement.";
-  return `${n} conducteurs confirment ce signalement.`;
+  if (n === 0) return "Aucun usager n'a encore confirmé.";
+  if (n === 1) return "1 usager confirme ce signalement.";
+  return `${n} usagers confirment ce signalement.`;
 }
 
 function precisionsCourt(n) {
@@ -470,8 +472,9 @@ function initMap() {
 function markerHtml(report) {
   const style = styleOf(report.type);
   const selectedClass = report.id === state.selectedId ? " is-selected" : "";
+  const clearing = report.degages ? " is-clearing" : "";
   return `
-    <div class="marker${selectedClass}">
+    <div class="marker${selectedClass}${clearing}">
       <span class="marker-label">${esc(report.lieu)}</span>
       <span class="pin-wrap">
         <svg class="pin-svg" viewBox="0 0 44 58" width="44" height="56" aria-hidden="true">
@@ -631,38 +634,47 @@ function incidentsNotables() {
 }
 
 function renderChrome() {
-  const button = document.getElementById("tendance");
+  const wrap = document.getElementById("tendance-wrap");
+  const toggle = document.getElementById("tendance-toggle");
+  const bar = document.getElementById("tendance-bar");
   const title = document.getElementById("tendance-titre");
   const detail = document.getElementById("tendance-detail");
   const panel = document.getElementById("tendance-panel");
   const liste = document.getElementById("tendance-liste");
   const trend = state.tendance;
-  button.classList.remove("tendance-fluide", "tendance-ralentie", "tendance-dense", "is-loading", "is-open", "is-live");
+  wrap.classList.remove("tendance-fluide", "tendance-ralentie", "tendance-dense", "is-loading", "is-open", "is-live");
   if (!trend) {
     state.tendanceOuverte = false;
-    button.classList.add("is-loading");
-    button.disabled = true;
-    button.setAttribute("aria-expanded", "false");
+    wrap.classList.add("is-loading");
+    toggle.disabled = true;
+    toggle.hidden = false;
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-label", "Circulation");
     title.textContent = state.error ? "Carte indisponible" : "Lecture de la circulation…";
     detail.textContent = state.error ? "Réessayez dans un instant." : "Libreville";
+    bar.hidden = true;
     panel.hidden = true;
     liste.innerHTML = "";
     return;
   }
   const open = state.tendanceOuverte;
-  button.disabled = false;
-  button.classList.add(`tendance-${trend.niveau}`);
-  button.classList.toggle("is-open", open);
-  if (trend.niveau === "dense") button.classList.add("is-live");
-  button.setAttribute("aria-expanded", open ? "true" : "false");
+  toggle.disabled = false;
+  wrap.classList.add(`tendance-${trend.niveau}`);
+  wrap.classList.toggle("is-open", open);
+  if (trend.niveau === "dense") wrap.classList.add("is-live");
+  toggle.hidden = open;
+  bar.hidden = !open;
+  toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  toggle.setAttribute("aria-label", trend.titre);
   title.textContent = trend.titre;
   detail.textContent = trend.detail;
   panel.hidden = !open;
   liste.innerHTML = incidentsNotables().map((report) => {
     const style = styleOf(report.type);
+    const leve = report.degages ? ` · Dégagé ×${report.degages}` : "";
     return `<li><button type="button" class="tendance-hit" data-id="${report.id}">
       <span class="type-icon" style="background:${style.pin};color:${style.chipText}">${iconSvg(report.type, 16)}</span>
-      <span class="tendance-hit-copy"><strong>${esc(report.lieu)}</strong><small>${esc(report.type_label)} · ${esc(report.relatif)}</small></span>
+      <span class="tendance-hit-copy"><strong>${esc(report.lieu)}</strong><small>${esc(report.type_label)} · ${esc(report.relatif)}${leve}</small></span>
       <span class="item-count">×${report.appuis}</span>
     </button></li>`;
   }).join("");
@@ -688,6 +700,7 @@ function itemHtml(report) {
         </span>
         <span class="item-meta">${esc(meta)}</span>
         <span class="item-excerpt">${esc(report.commentaire)}</span>
+        ${report.degages ? `<span class="item-clear">${uiIcon("clear", 14)} Dégagé ×${report.degages}</span>` : ""}
       </span>
     </button>`;
 }
@@ -712,7 +725,7 @@ function emptyHtml() {
   if (state.filter !== "tous") {
     return `<div class="state"><h2>Rien pour ce filtre</h2><p>Aucun signalement de ce type pour le moment. Essayez un autre filtre, ou publiez ce que vous voyez sur la route.</p></div>`;
   }
-  return `<div class="state"><h2>La route est calme</h2><p>Aucun signalement à Libreville pour l'instant. Si une situation peut créer un bouchon, signalez-la.</p><button type="button" class="btn btn-primary" data-action="compose">${uiIcon("plus")} Signaler un incident</button></div>`;
+  return `<div class="state"><h2>La route est calme</h2><p>Aucun signalement à Libreville pour l'instant. Si une situation peut créer un bouchon, signalez-la.</p><button type="button" class="btn btn-primary" data-action="compose">${uiIcon("alarm")} Signaler un incident</button></div>`;
 }
 
 function renderFeed() {
@@ -740,7 +753,7 @@ function renderFeed() {
         </div>
         <div class="sheet-actions">
           <button type="button" class="btn btn-ghost btn-compact" data-action="compte">${uiIcon(compteIcon)} ${compteLabel}</button>
-          <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("plus")} Signaler</button>
+          <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("alarm")} Signaler</button>
         </div>
       </div>
       ${offlineNote()}
@@ -784,10 +797,18 @@ function renderDetail() {
   const hint = report.appuye
     ? `${appuisPhrase(report.appuis)} Recliquez pour retirer la vôtre.`
     : appuisPhrase(report.appuis);
+  const degages = report.degages || 0;
+  const degageHint = report.degage
+    ? "Vous dites que c'est dégagé. Recliquez pour annuler."
+    : degages === 1
+      ? "1 usager dit que c'est dégagé. Un deuxième retire l'alerte."
+      : degages > 1
+        ? `${degages} usagers disent que c'est dégagé.`
+        : "Si la situation n'est plus là, dites que c'est dégagé.";
   return `
     <div class="sheet-head">
       <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("back")} Retour</button>
-      <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("plus")} Signaler</button>
+      <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("alarm")} Signaler</button>
     </div>
     <article class="detail">
       <div class="detail-kicker">
@@ -796,11 +817,17 @@ function renderDetail() {
       </div>
       <h2>${esc(report.lieu)}</h2>
       <p class="detail-text">${esc(report.commentaire)}</p>
-      <button type="button" class="appui${report.appuye ? " is-on" : ""}" data-action="appui" data-id="${report.id}" aria-pressed="${report.appuye ? "true" : "false"}" aria-label="${report.appuye ? "Confirmé" : "Confirmer"} ×${report.appuis}">
-        <span>${uiIcon(report.appuye ? "check" : "plus")} ${report.appuye ? "Confirmé" : "Confirmer"}</span>
-        <span class="appui-count">×${report.appuis}</span>
-      </button>
-      <p class="appui-hint">${esc(hint)}</p>
+      <div class="verdict">
+        <button type="button" class="appui${report.appuye ? " is-on" : ""}" data-action="appui" data-id="${report.id}" aria-pressed="${report.appuye ? "true" : "false"}" aria-label="${report.appuye ? "Confirmé" : "Confirmer"} ×${report.appuis}">
+          <span>${uiIcon(report.appuye ? "check" : "plus")} ${report.appuye ? "Confirmé" : "Confirmer"}</span>
+          <span class="appui-count">×${report.appuis}</span>
+        </button>
+        <button type="button" class="appui degage${report.degage ? " is-on" : ""}" data-action="degage" data-id="${report.id}" aria-pressed="${report.degage ? "true" : "false"}" aria-label="${report.degage ? "Dégagé" : "C'est dégagé"} ×${degages}">
+          <span>${uiIcon(report.degage ? "check" : "clear")} ${report.degage ? "Dégagé" : "C'est dégagé"}</span>
+          <span class="appui-count">×${degages}</span>
+        </button>
+      </div>
+      <p class="appui-hint">${esc(hint)}<br><span class="degage-hint">${esc(degageHint)}</span></p>
       <section class="notes" aria-label="Précisions">
         <h3>Précisions${notes.length ? ` <span>${notes.length}</span>` : ""}</h3>
         ${notes.length ? `<ul class="note-list">${notes.map(noteHtml).join("")}</ul>` : '<p class="muted">Aucune précision pour l\'instant. Ajoutez ce que vous voyez sur place.</p>'}
@@ -1191,6 +1218,31 @@ async function publish(event) {
   }
 }
 
+async function degager(id) {
+  const current = state.reports.find((item) => item.id === id);
+  if (!current) return;
+  try {
+    const data = await api(`/api/signalements/${id}/degage/`, { method: "POST" });
+    if (data.retire) {
+      state.reports = state.reports.filter((item) => item.id !== id);
+      state.markerKey = "";
+      if (state.selectedId === id) {
+        state.selectedId = null;
+        state.mode = "feed";
+        state.returnMode = "feed";
+        history.replaceState(null, "", `${location.pathname}${location.search}`);
+      }
+      toast("Deux usagers disent que c'est dégagé. L'alerte est retirée.");
+      render();
+      return;
+    }
+    upsert(data.signalement);
+    render();
+  } catch (error) {
+    toast(messageFrom(error, "Le vote n'a pas pu être enregistré."));
+  }
+}
+
 async function support(id) {
   const current = state.reports.find((item) => item.id === id);
   if (!current) return;
@@ -1284,6 +1336,7 @@ async function quietRefresh() {
   if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) return;
   try {
     const precedents = state.reports.slice();
+    const regardait = state.mode === "detail" ? state.selectedId : null;
     const data = await api("/api/signalements/");
     if (precedents.length) surveiller(precedents, data.signalements || []);
     state.reports = data.signalements;
@@ -1294,6 +1347,7 @@ async function quietRefresh() {
     if (state.mode === "detail" && !selected()) {
       state.mode = "feed";
       state.selectedId = null;
+      if (regardait) toast("Ce signalement n'est plus là.");
     }
     render();
   } catch (error) {
@@ -1356,6 +1410,10 @@ function renderSearchResults() {
 }
 
 function setSearchOpen(open) {
+  if (open && state.tendanceOuverte) {
+    state.tendanceOuverte = false;
+    renderChrome();
+  }
   state.searchOpen = open;
   const root = document.getElementById("search");
   const field = document.getElementById("search-field");
@@ -1622,6 +1680,7 @@ function onSheetClick(event) {
   else if (action === "type") setType(el.dataset.type);
   else if (action === "pick") startPick();
   else if (action === "appui") support(Number(el.dataset.id));
+  else if (action === "degage") degager(Number(el.dataset.id));
   else if (action === "retry") reload();
   else if (action === "clear-place") clearPlace();
   else if (action === "compte") ouvrirCompte();
@@ -1742,10 +1801,19 @@ function bind() {
       renderChrome();
     }
   });
-  document.getElementById("tendance").addEventListener("click", () => {
+  document.getElementById("tendance-toggle").addEventListener("click", () => {
     if (!state.tendance) return;
-    state.tendanceOuverte = !state.tendanceOuverte;
+    if (state.searchOpen) setSearchOpen(false);
+    state.tendanceOuverte = true;
     renderChrome();
+  });
+  document.getElementById("tendance-close").addEventListener("click", () => {
+    state.tendanceOuverte = false;
+    renderChrome();
+  });
+  document.getElementById("tendance-signaler").addEventListener("click", () => {
+    state.tendanceOuverte = false;
+    showCompose();
   });
   document.getElementById("tendance-panel").addEventListener("click", (event) => {
     const hit = event.target.closest(".tendance-hit");

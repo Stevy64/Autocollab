@@ -35,16 +35,27 @@
           <span class="brand-city">Libreville</span>
         </span>
       </div>
-      <div class="tendance-wrap" id="tendance-wrap">
-        <button type="button" class="tendance is-loading" id="tendance" disabled aria-expanded="false" aria-controls="tendance-panel">
+      <div class="tendance-wrap is-loading" id="tendance-wrap">
+        <button type="button" class="tendance-toggle" id="tendance-toggle" disabled aria-expanded="false" aria-controls="tendance-bar" aria-label="Circulation">
           <span class="dot" aria-hidden="true"></span>
-          <span class="tendance-copy">
-            <strong id="tendance-titre">Lecture de la circulation…</strong>
-          </span>
-          <svg class="tendance-chevron ui-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path d="m6.5 9.5 5.5 5.5 5.5-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
         </button>
+        <div class="tendance-bar" id="tendance-bar" hidden>
+          <span class="dot" id="tendance-dot" aria-hidden="true"></span>
+          <strong id="tendance-titre">Lecture de la circulation…</strong>
+          <button type="button" class="tendance-signaler" id="tendance-signaler">
+            <svg class="ui-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6.2 16.5h11.6M12 4.2a4.6 4.6 0 0 1 4.6 4.6c0 3.2.8 4.4 1.4 5.2H6c.6-.8 1.4-2 1.4-5.2A4.6 4.6 0 0 1 12 4.2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M10.2 17.2a1.8 1.8 0 0 0 3.6 0" fill="none" stroke="currentColor" stroke-width="1.7"/>
+              <path d="M19.2 5.2 21 3.6M4.8 5.2 3 3.6M12 2.2v1.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+            Signaler
+          </button>
+          <button type="button" class="search-close" id="tendance-close" aria-label="Fermer la circulation">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
         <div class="tendance-panel" id="tendance-panel" hidden>
           <p id="tendance-detail">Libreville</p>
           <ul id="tendance-liste"></ul>

@@ -130,6 +130,10 @@ class WebSliceTests(SimpleTestCase):
         self.assertIn("Les autres usagers de la route", script)
         self.assertIn("pin-count", script)
         self.assertIn("tendance-panel", script)
+        self.assertIn("usagers confirment", script)
+        self.assertIn("C'est dégagé", script)
+        self.assertIn('uiIcon("alarm")', script)
+        self.assertNotIn("conducteurs confirment", script)
         self.assertNotIn("${n}×", script)
         self.assertNotIn("déjà confirmé", script)
 

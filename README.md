@@ -71,6 +71,8 @@ Chaque processus écrit une ligne JSON sur la sortie d’erreur, logger `wayize`
 | `signalement.created` | `signalements` | création : id, type, lieu, longueur du texte |
 | `signalement.rejected` / `signalement.rate_limited` | `signalements` | validation ou plafond de 8 par heure |
 | `appui.recorded` / `appui.removed` | `appuis` | confirmation ajoutée ou retirée |
+| `degage.recorded` / `degage.removed` | `appuis` | un usager dit que c'est dégagé, ou retire son vote |
+| `signalement.cleared` | `appuis` | deux votes « dégagé » retirent l'alerte |
 | `signalement.expired` | `signalements` | alertes de plus de trois heures retirées, nombre seulement |
 | `commentaire.created` | `commentaires` | précision : id et longueur, pas le texte |
 | `error` | les deux | exception, type et message court |
@@ -82,8 +84,8 @@ L’en-tête de réponse `X-Request-Id` est le même des deux côtés, ce qui re
 - Carte centrée sur Libreville, fond OpenStreetMap.
 - Signalement manuel : type, phrase courte, quartier connu ou point posé sur la carte.
 - Confirmation, que l'on peut retirer, et précisions courtes, avec les compteurs.
-- Liste des signalements récents, qui recentre la carte. Un signalement disparaît au bout de trois heures.
-- Tendance des trois dernières heures, repliable.
+- Liste des signalements récents, qui recentre la carte. Un signalement disparaît au bout de trois heures. Deux usagers qui disent « c'est dégagé » le retirent tout de suite ; un seul vote reste visible.
+- Tendance des trois dernières heures, en cercle, qui se déploie en barre.
 - États vide, chargement et erreur. Téléphone et bureau.
 - PWA : manifeste, service worker, icônes. Sur `localhost`, le navigateur peut proposer l’installation.
 

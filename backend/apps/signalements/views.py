@@ -36,7 +36,10 @@ def purger_expires():
 
 def base_signalements():
     return (
-        Signalement.objects.annotate(appui_count=Count("appuis"))
+        Signalement.objects.annotate(
+            appui_count=Count("appuis", distinct=True),
+            degage_count=Count("degages", distinct=True),
+        )
         .prefetch_related(
             Prefetch(
                 "commentaires",
@@ -61,6 +64,19 @@ def ids_appuyes(cle, identifiants):
     )
 
 
+def ids_degages(cle, identifiants):
+    if not cle or not identifiants:
+        return set()
+    from apps.appuis.models import Degage
+
+    return set(
+        Degage.objects.filter(session_cle=cle, signalement_id__in=identifiants).values_list(
+            "signalement_id",
+            flat=True,
+        )
+    )
+
+
 def charger(pk):
     return base_signalements().get(pk=pk)
 
@@ -70,8 +86,10 @@ def reponse_signalement(request, pk, status=200):
         item = charger(pk)
     except Signalement.DoesNotExist:
         return erreur("Signalement introuvable.", status=404)
-    appuye = item.id in ids_appuyes(cle_session(request), [item.id])
-    return reponse({"signalement": signalement_public(item, appuye)}, status=status)
+    cle = cle_session(request)
+    appuye = item.id in ids_appuyes(cle, [item.id])
+    degage = item.id in ids_degages(cle, [item.id])
+    return reponse({"signalement": signalement_public(item, appuye, degage)}, status=status)
 
 
 @require_GET
@@ -106,11 +124,15 @@ def signalements(request):
 def lister(request):
     purger_expires()
     items = list(base_signalements()[:100])
-    appuyes = ids_appuyes(cle_session(request), [item.id for item in items])
+    cle = cle_session(request)
+    identifiants = [item.id for item in items]
+    appuyes = ids_appuyes(cle, identifiants)
+    degages = ids_degages(cle, identifiants)
     return reponse(
         {
             "signalements": [
-                signalement_public(item, item.id in appuyes) for item in items
+                signalement_public(item, item.id in appuyes, item.id in degages)
+                for item in items
             ],
             "tendance": tendance(items),
         }

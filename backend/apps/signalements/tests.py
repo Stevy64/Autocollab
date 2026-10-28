@@ -161,6 +161,42 @@ class MapSliceTests(TestCase):
         missing = self.client.post("/api/signalements/999999/appui/")
         self.assertEqual(missing.status_code, 404)
 
+    def test_two_clear_votes_remove_the_report(self):
+        created = self.post_json("/api/signalements/", payload())
+        pk = created.json()["signalement"]["id"]
+        url = f"/api/signalements/{pk}/degage/"
+        with self.assertLogs("wayize", level="INFO") as captured:
+            first = self.client.post(url)
+        self.assertEqual(first.status_code, 200, first.content)
+        self.assertEqual(first.json()["signalement"]["degages"], 1)
+        self.assertTrue(first.json()["signalement"]["degage"])
+        self.assertTrue(Signalement.objects.filter(pk=pk).exists())
+        journal = "\n".join(captured.output)
+        self.assertIn("degage.recorded", journal)
+        self.assertNotIn(CLE, journal)
+
+        with self.assertLogs("wayize", level="INFO") as removed:
+            off = self.client.post(url)
+        self.assertEqual(off.json()["signalement"]["degages"], 0)
+        self.assertFalse(off.json()["signalement"]["degage"])
+        self.assertIn("degage.removed", "\n".join(removed.output))
+        self.assertNotIn(CLE, "\n".join(removed.output))
+
+        again = self.client.post(url)
+        self.assertEqual(again.json()["signalement"]["degages"], 1)
+        other = Client(HTTP_X_WAYIZE_SESSION=AUTRE)
+        with self.assertLogs("wayize", level="INFO") as cleared:
+            second = other.post(url)
+        self.assertEqual(second.status_code, 200, second.content)
+        self.assertTrue(second.json()["retire"])
+        self.assertEqual(second.json()["id"], pk)
+        self.assertFalse(Signalement.objects.filter(pk=pk).exists())
+        journal_fin = "\n".join(cleared.output)
+        self.assertIn("signalement.cleared", journal_fin)
+        self.assertIn("degage.recorded", journal_fin)
+        self.assertNotIn(CLE, journal_fin)
+        self.assertNotIn(AUTRE, journal_fin)
+
     def test_reports_expire_after_three_hours(self):
         created = self.post_json("/api/signalements/", payload())
         fresh_id = created.json()["signalement"]["id"]
