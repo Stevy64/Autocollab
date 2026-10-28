@@ -1,0 +1,81 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <meta name="description" content="Signalements de bouchons, accidents, travaux et contrôles à Libreville. Une carte simple, alimentée par les conducteurs.">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Wayizé">
+  <title>Wayizé — Circulation à Libreville</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="{% static 'trafic/icons/favicon-32.png' %}" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="{% static 'trafic/icons/apple-touch-icon.png' %}">
+  <link rel="stylesheet" href="{% static 'trafic/vendor/leaflet/leaflet.css' %}">
+  <link rel="stylesheet" href="{% static 'trafic/css/app.css' %}">
+</head>
+<body>
+  <a class="skip" href="#sheet">Aller aux signalements</a>
+  <div id="app">
+    <div id="map" role="application" aria-label="Carte de la circulation à Libreville"></div>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20">
+            <path d="M12 21s-6.2-5.8-6.2-10.4C5.8 7 8.6 4.4 12 4.4s6.2 2.6 6.2 6.2C18.2 15.2 12 21 12 21z" fill="#fff"/>
+            <circle cx="12" cy="10.5" r="2.15" fill="#F5B400"/>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">Wayizé</span>
+          <span class="brand-city">Libreville</span>
+        </span>
+      </div>
+      <button type="button" class="tendance is-loading" id="tendance" disabled>
+        <span class="dot" aria-hidden="true"></span>
+        <span class="tendance-copy">
+          <strong id="tendance-titre">Lecture de la circulation…</strong>
+          <span id="tendance-detail">Libreville</span>
+        </span>
+      </button>
+      <button type="button" class="icon-btn" id="recenter" aria-label="Recentrer la carte sur Libreville">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M12 3.2v3.2M12 17.6v3.2M3.2 12h3.2M17.6 12h3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </header>
+    <div id="pick-banner" class="pick-banner" hidden>
+      <p>Touchez la carte pour placer le signalement</p>
+      <button type="button" id="pick-cancel">Annuler</button>
+    </div>
+    <aside id="sheet" class="sheet" aria-label="Signalements">
+      <button type="button" class="grabber" id="grabber" aria-label="Redimensionner la liste des signalements"></button>
+      <div id="sheet-content" class="sheet-content">
+        <div class="sheet-head">
+          <div>
+            <h1>En ce moment</h1>
+            <p>Lecture des signalements…</p>
+          </div>
+        </div>
+        <div class="skeleton-list" aria-hidden="true">
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+        </div>
+      </div>
+    </aside>
+    <div id="toast" class="toast" hidden role="status"></div>
+  </div>
+  <noscript>
+    <div class="noscript">Activez JavaScript pour afficher la carte et les signalements de Libreville.</div>
+  </noscript>
+  {{ boot|json_script:"boot-data" }}
+  <script src="{% static 'trafic/vendor/leaflet/leaflet.js' %}" defer></script>
+  <script src="{% static 'trafic/js/app.js' %}" defer></script>
+</body>
+</html>
