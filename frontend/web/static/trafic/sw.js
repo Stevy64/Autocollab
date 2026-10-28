@@ -1,5 +1,5 @@
 const CACHE = "wayize-shell-v2";
-const TILES = "wayize-tiles-v2";
+const TILES = "wayize-tiles-v3";
 const TILE_LIMIT = 120;
 const SHELL = [
   "/",
@@ -52,8 +52,8 @@ self.addEventListener("activate", (event) => {
 
 function isTile(url) {
   return (
-    url.hostname === "tile.openstreetmap.org" ||
-    url.hostname.endsWith(".tile.openstreetmap.org")
+    url.hostname === "tile.openstreetmap.fr" ||
+    url.hostname.endsWith(".tile.openstreetmap.fr")
   );
 }
 
@@ -84,16 +84,18 @@ async function tile(request) {
   const cache = await caches.open(TILES);
   try {
     const response = await fetch(request);
-    if (response && response.ok) {
+    const type = (response.headers.get("content-type") || "").toLowerCase();
+    if (response && response.ok && type.startsWith("image/")) {
       cache.put(request, response.clone());
       trimTiles(cache);
+      return response;
     }
-    return response;
   } catch (error) {
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    throw error;
+    // Réseau coupé : on retombe sur la tuile déjà en cache.
   }
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  return Response.error();
 }
 
 function offlinePage() {

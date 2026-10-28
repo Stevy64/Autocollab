@@ -93,7 +93,7 @@ Pas de comptes, pas de paiement, pas de géolocalisation continue. La clé secr�
 
 ## Crédits
 
-- Carte : [OpenStreetMap](https://www.openstreetmap.org/copyright).
+- Carte : données [OpenStreetMap](https://www.openstreetmap.org/copyright), tuiles [OSM France](https://www.openstreetmap.fr/). Le serveur `tile.openstreetmap.org` refuse l'application.
 - [Leaflet](https://leafletjs.com/) 1.9.4 (BSD-2-Clause), fichiers dans `frontend/web/static/trafic/vendor/leaflet/`.
 - DM Sans, licence SIL Open Font License : `frontend/web/static/trafic/fonts/OFL.txt`.
 - Découpage des services : [Gabomazone_SPA](https://github.com/Stevy64/Gabomazone_SPA).

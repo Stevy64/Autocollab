@@ -276,9 +276,13 @@ function initMap() {
   map.setMaxBounds(bounds.pad(0.2));
   map.setView([boot.centre.latitude, boot.centre.longitude], homeZoom());
 
-  const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  // Le serveur de tuiles officiel refuse l'application (403). OSM France
+  // diffuse les mêmes données, avec l'attribution qu'il demande.
+  const tiles = L.tileLayer("https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png", {
+    subdomains: "abc",
+    maxZoom: 20,
+    crossOrigin: "anonymous",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://www.openstreetmap.fr/">OSM France</a>',
   });
   let tileErrors = 0;
   tiles.on("tileerror", () => {

@@ -114,8 +114,16 @@ class WebSliceTests(SimpleTestCase):
         worker = self.client.get("/sw.js")
         self.assertEqual(worker.status_code, 200)
         self.assertIn("javascript", worker["Content-Type"])
-        self.assertContains(worker, "wayize-shell-v2")
         self.assertEqual(worker["Service-Worker-Allowed"], "/")
+        source = b"".join(worker.streaming_content).decode("utf-8")
+        self.assertIn("wayize-shell-v2", source)
+        self.assertIn("wayize-tiles-v3", source)
+        self.assertIn("tile.openstreetmap.fr", source)
+        self.assertNotIn("tile.openstreetmap.org", source)
+
+        script = (Path(__file__).resolve().parent / "static" / "trafic" / "js" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("tile.openstreetmap.fr/osmfr/", script)
+        self.assertNotIn("tile.openstreetmap.org", script)
 
     def test_proxy_forwards_the_anonymous_session_not_the_cookie(self):
         with self.assertLogs("wayize", level="INFO") as captured:
