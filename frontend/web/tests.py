@@ -127,7 +127,11 @@ class WebSliceTests(SimpleTestCase):
         self.assertIn("×${n}", script)
         self.assertIn("wayize.memoire.v1", script)
         self.assertIn("Activer Premium", script)
+        self.assertIn("Les autres usagers de la route", script)
+        self.assertIn("pin-count", script)
+        self.assertIn("tendance-panel", script)
         self.assertNotIn("${n}×", script)
+        self.assertNotIn("déjà confirmé", script)
 
     def test_proxy_forwards_the_anonymous_session_not_the_cookie(self):
         with self.assertLogs("wayize", level="INFO") as captured:

@@ -126,7 +126,7 @@ class MapSliceTests(TestCase):
         ids = [item["id"] for item in listed.json()["signalements"]]
         self.assertIn(report["id"], ids)
 
-    def test_support_is_once_per_browser_and_stacks_across_drivers(self):
+    def test_support_toggles_and_stacks_across_drivers(self):
         created = self.post_json(
             "/api/signalements/",
             payload(
@@ -138,16 +138,21 @@ class MapSliceTests(TestCase):
         url = f"/api/signalements/{pk}/appui/"
         with self.assertLogs("wayize", level="INFO") as captured:
             first = self.client.post(url)
-        second = self.client.post(url)
+        with self.assertLogs("wayize", level="INFO") as removed:
+            second = self.client.post(url)
         self.assertEqual(first.status_code, 200)
         self.assertEqual(first.json()["signalement"]["appuis"], 1)
-        self.assertEqual(second.json()["signalement"]["appuis"], 1)
-        self.assertTrue(second.json()["signalement"]["appuye"])
+        self.assertTrue(first.json()["signalement"]["appuye"])
+        self.assertEqual(second.json()["signalement"]["appuis"], 0)
+        self.assertFalse(second.json()["signalement"]["appuye"])
         journal = "\n".join(captured.output)
         self.assertIn("appui.recorded", journal)
+        self.assertIn("appui.removed", "\n".join(removed.output))
         self.assertIn("boundary.read", journal)
         self.assertNotIn(CLE, journal)
 
+        again = self.client.post(url)
+        self.assertEqual(again.json()["signalement"]["appuis"], 1)
         other = Client(HTTP_X_WAYIZE_SESSION=AUTRE)
         third = other.post(url)
         self.assertEqual(third.json()["signalement"]["appuis"], 2)
@@ -155,6 +160,24 @@ class MapSliceTests(TestCase):
 
         missing = self.client.post("/api/signalements/999999/appui/")
         self.assertEqual(missing.status_code, 404)
+
+    def test_reports_expire_after_three_hours(self):
+        created = self.post_json("/api/signalements/", payload())
+        fresh_id = created.json()["signalement"]["id"]
+        old = Signalement.objects.create(
+            type="bouchon",
+            commentaire="Ancien bouchon qui ne devrait plus s'afficher.",
+            lieu="Glass",
+            latitude=0.3771157,
+            longitude=9.4532994,
+            session_cle="vieux",
+            cree_le=timezone.now() - timedelta(hours=3, minutes=1),
+        )
+        listed = self.client.get("/api/signalements/")
+        ids = [item["id"] for item in listed.json()["signalements"]]
+        self.assertNotIn(old.pk, ids)
+        self.assertFalse(Signalement.objects.filter(pk=old.pk).exists())
+        self.assertIn(fresh_id, ids)
 
     def test_comment_shows_up_for_everyone(self):
         created = self.post_json("/api/signalements/", payload())

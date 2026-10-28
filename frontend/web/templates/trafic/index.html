@@ -35,13 +35,21 @@
           <span class="brand-city">Libreville</span>
         </span>
       </div>
-      <button type="button" class="tendance is-loading" id="tendance" disabled>
-        <span class="dot" aria-hidden="true"></span>
-        <span class="tendance-copy">
-          <strong id="tendance-titre">Lecture de la circulation…</strong>
-          <span id="tendance-detail">Libreville</span>
-        </span>
-      </button>
+      <div class="tendance-wrap" id="tendance-wrap">
+        <button type="button" class="tendance is-loading" id="tendance" disabled aria-expanded="false" aria-controls="tendance-panel">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="tendance-copy">
+            <strong id="tendance-titre">Lecture de la circulation…</strong>
+          </span>
+          <svg class="tendance-chevron ui-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="m6.5 9.5 5.5 5.5 5.5-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="tendance-panel" id="tendance-panel" hidden>
+          <p id="tendance-detail">Libreville</p>
+          <ul id="tendance-liste"></ul>
+        </div>
+      </div>
       <div class="search" id="search">
         <button type="button" class="icon-btn" id="search-toggle" aria-expanded="false" aria-controls="search-field" aria-label="Rechercher un quartier ou un lieu">
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -67,7 +75,7 @@
       </button>
     </header>
     <div id="pick-banner" class="pick-banner" hidden>
-      <p>Touchez la carte pour placer le signalement</p>
+      <p><svg class="ui-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 20.5s-5.2-4.8-5.2-9.2a5.2 5.2 0 0 1 10.4 0c0 4.4-5.2 9.2-5.2 9.2z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="11.2" r="1.7" fill="currentColor"/></svg> Touchez la carte pour placer le signalement</p>
       <button type="button" id="pick-cancel">Annuler</button>
     </div>
     <aside id="sheet" class="sheet" aria-label="Signalements">

@@ -108,7 +108,7 @@ GRAINE = [
     {
         "type": "travaux",
         "lieu_id": "pk8",
-        "minutes": 190,
+        "minutes": 145,
         "appuis": 7,
         "commentaire": (
             "Tranchée sur l'avenue au PK8. Circulation alternée, "
@@ -121,7 +121,7 @@ GRAINE = [
     {
         "type": "travaux",
         "lieu_id": "oloumi",
-        "minutes": 260,
+        "minutes": 160,
         "appuis": 4,
         "commentaire": (
             "Reprise de chaussée à Oloumi. Une voie est neutralisée "
@@ -132,15 +132,15 @@ GRAINE = [
     {
         "type": "route_barree",
         "lieu_id": "port-owendo",
-        "minutes": 320,
+        "minutes": 170,
         "appuis": 15,
         "commentaire": (
             "L'accès poids lourds du port d'Owendo est fermé. "
             "Les voitures passent par la déviation d'Owendo centre."
         ),
         "notes": [
-            (240, "Les taxis passent par Owendo centre. Le quai reste fermé aux gros camions."),
-            (200, "Toujours le cas, j'ai fait demi-tour avant le port."),
+            (150, "Les taxis passent par Owendo centre. Le quai reste fermé aux gros camions."),
+            (110, "Toujours le cas, j'ai fait demi-tour avant le port."),
         ],
     },
 ]

@@ -15,6 +15,23 @@ from .models import Signalement
 from .present import signalement_public, tendance
 
 MAX_PAR_HEURE = 8
+DUREE_ALERTE = timedelta(hours=3)
+
+
+def purger_expires():
+    """Une alerte vit trois heures, puis elle quitte la base."""
+    seuil = timezone.now() - DUREE_ALERTE
+    anciens = Signalement.objects.filter(cree_le__lte=seuil)
+    nombre_retires = anciens.count()
+    if not nombre_retires:
+        return 0
+    anciens.delete()
+    journal(
+        "signalements",
+        "signalement.expired",
+        count=nombre_retires,
+    )
+    return nombre_retires
 
 
 def base_signalements():
@@ -87,6 +104,7 @@ def signalements(request):
 
 
 def lister(request):
+    purger_expires()
     items = list(base_signalements()[:100])
     appuyes = ids_appuyes(cle_session(request), [item.id for item in items])
     return reponse(

@@ -3,7 +3,7 @@ from django.views.decorators.http import require_POST
 from apps.http import erreur, lire_json, protege, texte_propre
 from apps.journal import journal, request_id
 from apps.signalements.models import Signalement
-from apps.signalements.views import reponse_signalement
+from apps.signalements.views import purger_expires, reponse_signalement
 
 from .models import Commentaire
 
@@ -11,6 +11,7 @@ from .models import Commentaire
 @protege("commentaires")
 @require_POST
 def commentaire(request, pk):
+    purger_expires()
     if not Signalement.objects.filter(pk=pk).exists():
         journal(
             "commentaires",

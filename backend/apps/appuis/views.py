@@ -5,7 +5,7 @@ from apps.http import erreur, protege
 from apps.identite import cle_session
 from apps.journal import journal, request_id
 from apps.signalements.models import Signalement
-from apps.signalements.views import reponse_signalement
+from apps.signalements.views import purger_expires, reponse_signalement
 
 from .models import Appui
 
@@ -13,6 +13,7 @@ from .models import Appui
 @protege("appuis")
 @require_POST
 def appui(request, pk):
+    purger_expires()
     if not Signalement.objects.filter(pk=pk).exists():
         journal(
             "appuis",
@@ -44,17 +45,26 @@ def appui(request, pk):
             raison="identite",
         )
         return erreur("Ouvrez Wayizé dans le navigateur pour appuyer ce signalement.")
-    nouveau = True
+    deja = Appui.objects.filter(signalement_id=pk, session_cle=cle).first()
+    if deja:
+        deja.delete()
+        journal(
+            "appuis",
+            "appui.removed",
+            request_id=request_id(request),
+            signalement_id=pk,
+        )
+        return reponse_signalement(request, pk)
     try:
         with transaction.atomic():
             Appui.objects.create(signalement_id=pk, session_cle=cle)
     except IntegrityError:
-        nouveau = False
+        pass
     journal(
         "appuis",
         "appui.recorded",
         request_id=request_id(request),
         signalement_id=pk,
-        nouveau=nouveau,
+        nouveau=True,
     )
     return reponse_signalement(request, pk)

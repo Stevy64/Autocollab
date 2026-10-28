@@ -57,6 +57,7 @@ const state = {
   markerKey: "",
   place: null,
   searchOpen: false,
+  tendanceOuverte: false,
   compte: null,
   jeton: "",
   listeId: null,
@@ -81,8 +82,38 @@ function styleOf(type) {
   return TYPE_STYLE[type] || TYPE_STYLE.autre;
 }
 
-function iconSvg(type) {
-  return `<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">${GLYPH[type] || GLYPH.autre}</svg>`;
+function iconSvg(type, size = 18) {
+  return `<svg class="ui-icon" viewBox="0 0 16 16" width="${size}" height="${size}" aria-hidden="true">${GLYPH[type] || GLYPH.autre}</svg>`;
+}
+
+const UI = {
+  plus: '<path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  user: '<circle cx="12" cy="8.2" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.4 19.2c1.3-2.7 3.6-4 6.6-4s5.3 1.3 6.6 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  check: '<path d="M5 12.4 9.2 16.5 19 7.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  back: '<path d="M14.5 6.5 9 12l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  close: '<path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  send: '<path d="M4.5 12 19 5.5l-5.6 13.2-2.2-5.6L4.5 12z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  pin: '<path d="M12 20.5s-5.2-4.8-5.2-9.2a5.2 5.2 0 0 1 10.4 0c0 4.4-5.2 9.2-5.2 9.2z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="11.2" r="1.7" fill="currentColor"/>',
+  bell: '<path d="M6.2 16.5h11.6M12 4.2a4.6 4.6 0 0 1 4.6 4.6c0 3.2.8 4.4 1.4 5.2H6c.6-.8 1.4-2 1.4-5.2A4.6 4.6 0 0 1 12 4.2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M10.2 17.2a1.8 1.8 0 0 0 3.6 0" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  volume: '<path d="M5 10h2.4L11 6.8v10.4L7.4 14H5v-4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14.2 9.2a3.2 3.2 0 0 1 0 5.6M16.4 7.2a6 6 0 0 1 0 9.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  locate: '<circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 3.5v2.4M12 18.1v2.4M3.5 12h2.4M18.1 12h2.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  clock: '<circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 8.2V12l2.5 1.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  moon: '<path d="M15.5 4.8A6.8 6.8 0 1 0 18 14.8 5.4 5.4 0 0 1 15.5 4.8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+  list: '<path d="M9 7h10M9 12h10M9 17h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="5.5" cy="7" r="1" fill="currentColor"/><circle cx="5.5" cy="12" r="1" fill="currentColor"/><circle cx="5.5" cy="17" r="1" fill="currentColor"/>',
+  route: '<circle cx="7" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="17" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 8.2c2.2 0 3.2 2.2 3.2 3.8S14.8 16 17 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  trash: '<path d="M5.5 8h13M9 8V6.2h6V8M8 8l.6 10.2h6.8L16 8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  logout: '<path d="M10 6.5V5.2h8.2v13.6H10v-1.3M5 12h9M11.2 8.8 14.4 12l-3.2 3.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  star: '<path d="m12 4.2 1.8 3.8 4.2.6-3 3 .7 4.2L12 13.8 8.3 15.8l.7-4.2-3-3 4.2-.6L12 4.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  chevron: '<path d="m6.5 9.5 5.5 5.5 5.5-5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  layers: '<path d="m12 4 8 4.2L12 12.4 4 8.2 12 4zM6.2 12.2 12 15.2l5.8-3M6.2 15.4 12 18.4l5.8-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  mail: '<rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m5 7.5 7 5.2 7-5.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+  lock: '<rect x="6" y="10.5" width="12" height="8.2" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 10.5V8.4a3.5 3.5 0 0 1 7 0v2.1" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  car: '<path d="M4 14.5h16M6.2 14.2 7.6 9.2A1.4 1.4 0 0 1 9 8.2h6a1.4 1.4 0 0 1 1.4 1l1.4 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="8" cy="16.2" r="1.2" fill="currentColor"/><circle cx="16" cy="16.2" r="1.2" fill="currentColor"/>',
+};
+
+function uiIcon(name, size = 16) {
+  const path = UI[name] || "";
+  return `<svg class="ui-icon" viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">${path}</svg>`;
 }
 
 function csrf() {
@@ -356,8 +387,19 @@ function nearestLieu(latitude, longitude) {
   return best;
 }
 
+const DUREE_ALERTE_MS = 3 * 60 * 60 * 1000;
+const CHAUDS = ["bouchon", "accident", "route_barree"];
+const HEAT = ["accident", "route_barree", "bouchon", "police", "travaux", "autre"];
+
+function encoreValide(report) {
+  const cree = Date.parse(report.cree_le || "");
+  if (!cree) return true;
+  return Date.now() - cree < DUREE_ALERTE_MS;
+}
+
 function visibleReports() {
   return state.reports.filter((report) => {
+    if (!encoreValide(report)) return false;
     if (state.filter !== "tous" && report.type !== state.filter) return false;
     if (state.trajet && !reportMatchesTrajet(report)) return false;
     if (state.listeId && !reportMatchesListe(report)) return false;
@@ -421,6 +463,7 @@ function initMap() {
     if (!state.picking) return;
     setPickedPoint(event.latlng);
   });
+  map.on("zoomend moveend", () => syncMarkers());
   window.setTimeout(() => map.invalidateSize(), 200);
 }
 
@@ -430,34 +473,125 @@ function markerHtml(report) {
   return `
     <div class="marker${selectedClass}">
       <span class="marker-label">${esc(report.lieu)}</span>
-      <svg class="pin-svg" viewBox="0 0 44 58" width="44" height="56" aria-hidden="true">
-        <path d="M22 54C22 54 3.5 34.5 3.5 20.8 3.5 10.2 11.8 2.2 22 2.2S40.5 10.2 40.5 20.8C40.5 34.5 22 54 22 54z" fill="${style.pin}" stroke="#fff" stroke-width="1.5"/>
-        <circle cx="22" cy="21" r="11" fill="#fff"/>
-        <g transform="translate(14 13)" style="color:${style.glyph}">${GLYPH[report.type] || GLYPH.autre}</g>
-      </svg>
+      <span class="pin-wrap">
+        <svg class="pin-svg" viewBox="0 0 44 58" width="44" height="56" aria-hidden="true">
+          <path d="M22 54C22 54 3.5 34.5 3.5 20.8 3.5 10.2 11.8 2.2 22 2.2S40.5 10.2 40.5 20.8C40.5 34.5 22 54 22 54z" fill="${style.pin}" stroke="#fff" stroke-width="1.5"/>
+          <circle cx="22" cy="21" r="11" fill="#fff"/>
+          <g transform="translate(14 13)" style="color:${style.glyph}">${GLYPH[report.type] || GLYPH.autre}</g>
+        </svg>
+        <span class="pin-count">×${report.appuis}</span>
+      </span>
     </div>`;
 }
 
+function plusConfirme(reports) {
+  return reports.slice().sort((a, b) => (b.appuis || 0) - (a.appuis || 0))[0];
+}
+
+function couleurGroupe(reports) {
+  const type = reports.slice().sort((a, b) => HEAT.indexOf(a.type) - HEAT.indexOf(b.type))[0].type;
+  return styleOf(type).pin;
+}
+
+function groupesCarte(reports) {
+  const zoom = map.getZoom();
+  const radius = zoom >= 16 ? 0 : zoom >= 14 ? 30 : 48;
+  const groups = [];
+  const ordered = reports.slice().sort((a, b) => (b.appuis || 0) - (a.appuis || 0));
+  for (const report of ordered) {
+    const point = map.latLngToContainerPoint([report.latitude, report.longitude]);
+    const group = radius
+      ? groups.find((item) => Math.hypot(item.x - point.x, item.y - point.y) <= radius)
+      : null;
+    if (group) group.reports.push(report);
+    else groups.push({ x: point.x, y: point.y, reports: [report] });
+  }
+  if (radius) return groups;
+  const spread = [];
+  for (const group of groups) {
+    if (group.reports.length === 1) {
+      spread.push(group);
+      continue;
+    }
+    group.reports.forEach((report, index) => {
+      const angle = (index / group.reports.length) * Math.PI * 2;
+      const pixel = map.latLngToContainerPoint([report.latitude, report.longitude]);
+      const moved = map.containerPointToLatLng([
+        pixel.x + Math.cos(angle) * 22,
+        pixel.y + Math.sin(angle) * 22,
+      ]);
+      const next = map.latLngToContainerPoint(moved);
+      spread.push({ x: next.x, y: next.y, reports: [report], latlng: moved });
+    });
+  }
+  return spread;
+}
+
+function ouvrirGroupe(reports) {
+  if (reports.length === 1) {
+    selectReport(reports[0].id);
+    return;
+  }
+  const bounds = L.latLngBounds(reports.map((report) => [report.latitude, report.longitude]));
+  const same = bounds.getNorthEast().distanceTo(bounds.getSouthWest()) < 40;
+  if (same) {
+    map.setView(bounds.getCenter(), Math.max(map.getZoom(), 16), { animate: true });
+    return;
+  }
+  if (map.getZoom() >= 16) {
+    selectReport(plusConfirme(reports).id);
+    return;
+  }
+  map.fitBounds(bounds.pad(0.5), { maxZoom: 16, animate: true });
+}
+
 function syncMarkers() {
-  if (!markerLayer) return;
+  if (!markerLayer || !map) return;
   const reports = visibleReports();
-  const placeKey = state.place ? state.place.nom : "";
-  const key = `${state.selectedId}|${placeKey}|${reports.map((report) => `${report.id}:${report.appuis}:${report.commentaires[0] ? report.commentaires[0].id : 0}`).join(",")}`;
+  const groups = groupesCarte(reports);
+  const key = `${state.selectedId}|${map.getZoom()}|${groups.map((group) => `${Math.round(group.x)}:${Math.round(group.y)}:${group.reports.map((report) => `${report.id}:${report.appuis}`).join("+")}`).join(";")}`;
   if (key === state.markerKey) return;
   state.markerKey = key;
   markerLayer.clearLayers();
-  for (const report of reports) {
-    const id = report.id;
+  for (const group of groups) {
+    const latlng = group.latlng || [group.reports[0].latitude, group.reports[0].longitude];
+    if (group.reports.length === 1) {
+      const report = group.reports[0];
+      const icon = L.divIcon({
+        className: "wayize-divicon",
+        html: markerHtml(report),
+        iconSize: [148, 86],
+        iconAnchor: [74, 84],
+      });
+      const marker = L.marker(latlng, {
+        icon,
+        keyboard: true,
+        title: `${report.type_label} à ${report.lieu}, confirmé ×${report.appuis}`,
+        zIndexOffset: report.id === state.selectedId ? 400 : report.appuis,
+      });
+      marker.on("click", (event) => {
+        L.DomEvent.stopPropagation(event);
+        if (state.picking) {
+          setPickedPoint(event.latlng);
+          return;
+        }
+        selectReport(report.id);
+      });
+      marker.addTo(markerLayer);
+      continue;
+    }
+    const max = plusConfirme(group.reports).appuis;
     const icon = L.divIcon({
       className: "wayize-divicon",
-      html: markerHtml(report),
-      iconSize: [148, 86],
-      iconAnchor: [74, 84],
+      html: `<div class="cluster" style="background:${couleurGroupe(group.reports)}"><strong>${group.reports.length}</strong><span>×${max}</span></div>`,
+      iconSize: [52, 52],
+      iconAnchor: [26, 26],
     });
-    const marker = L.marker([report.latitude, report.longitude], {
+    const marker = L.marker(latlng, {
       icon,
       keyboard: true,
-      title: `${report.type_label} à ${report.lieu}`,
+      title: `${group.reports.length} signalements, jusqu'à ×${max}`,
+      zIndexOffset: 200,
     });
     marker.on("click", (event) => {
       L.DomEvent.stopPropagation(event);
@@ -465,7 +599,7 @@ function syncMarkers() {
         setPickedPoint(event.latlng);
         return;
       }
-      selectReport(id);
+      ouvrirGroupe(group.reports);
     });
     marker.addTo(markerLayer);
   }
@@ -490,23 +624,48 @@ function syncPick() {
   }).addTo(pickLayer);
 }
 
+function incidentsNotables() {
+  return state.reports
+    .filter((report) => encoreValide(report) && CHAUDS.includes(report.type))
+    .slice(0, 6);
+}
+
 function renderChrome() {
   const button = document.getElementById("tendance");
   const title = document.getElementById("tendance-titre");
   const detail = document.getElementById("tendance-detail");
-  button.classList.remove("tendance-fluide", "tendance-ralentie", "tendance-dense", "is-loading");
+  const panel = document.getElementById("tendance-panel");
+  const liste = document.getElementById("tendance-liste");
   const trend = state.tendance;
+  button.classList.remove("tendance-fluide", "tendance-ralentie", "tendance-dense", "is-loading", "is-open", "is-live");
   if (!trend) {
+    state.tendanceOuverte = false;
     button.classList.add("is-loading");
     button.disabled = true;
+    button.setAttribute("aria-expanded", "false");
     title.textContent = state.error ? "Carte indisponible" : "Lecture de la circulation…";
     detail.textContent = state.error ? "Réessayez dans un instant." : "Libreville";
+    panel.hidden = true;
+    liste.innerHTML = "";
     return;
   }
+  const open = state.tendanceOuverte;
+  button.disabled = false;
   button.classList.add(`tendance-${trend.niveau}`);
-  button.disabled = !trend.focus_id;
+  button.classList.toggle("is-open", open);
+  if (trend.niveau === "dense") button.classList.add("is-live");
+  button.setAttribute("aria-expanded", open ? "true" : "false");
   title.textContent = trend.titre;
   detail.textContent = trend.detail;
+  panel.hidden = !open;
+  liste.innerHTML = incidentsNotables().map((report) => {
+    const style = styleOf(report.type);
+    return `<li><button type="button" class="tendance-hit" data-id="${report.id}">
+      <span class="type-icon" style="background:${style.pin};color:${style.chipText}">${iconSvg(report.type, 16)}</span>
+      <span class="tendance-hit-copy"><strong>${esc(report.lieu)}</strong><small>${esc(report.type_label)} · ${esc(report.relatif)}</small></span>
+      <span class="item-count">×${report.appuis}</span>
+    </button></li>`;
+  }).join("");
 }
 
 function offlineNote() {
@@ -516,17 +675,19 @@ function offlineNote() {
 
 function itemHtml(report) {
   const style = styleOf(report.type);
-  const bits = [report.type_label, report.relatif, appuisCourt(report.appuis)];
-  const notes = precisionsCourt((report.commentaires || []).length);
-  if (notes) bits.push(notes);
+  const notes = (report.commentaires || []).length;
+  const meta = `${report.type_label} · ${report.relatif}${notes ? ` · ${notes} précision${notes > 1 ? "s" : ""}` : ""}`;
   const active = report.id === state.selectedId ? " is-active" : "";
   return `
     <button type="button" class="item${active}" data-action="open" data-id="${report.id}">
-      <span class="type-icon" style="background:${style.pin};color:${style.chipText}">${iconSvg(report.type)}</span>
+      <span class="type-icon" style="background:${style.pin};color:${style.chipText}">${iconSvg(report.type, 20)}</span>
       <span class="item-body">
-        <span class="item-title">${esc(report.lieu)}</span>
+        <span class="item-top">
+          <span class="item-title">${esc(report.lieu)}</span>
+          <span class="item-count">×${report.appuis}</span>
+        </span>
+        <span class="item-meta">${esc(meta)}</span>
         <span class="item-excerpt">${esc(report.commentaire)}</span>
-        <span class="item-meta">${bits.map(esc).join(" · ")}</span>
       </span>
     </button>`;
 }
@@ -539,19 +700,19 @@ function emptyHtml() {
     return `<div class="state"><h2>Rien pour ce filtre</h2><p>Aucun signalement de ce type vers ${esc(state.place.nom)}.</p></div>`;
   }
   if (state.place) {
-    return `<div class="state"><h2>Rien vers ${esc(state.place.nom)}</h2><p>Aucun signalement pour ce lieu en ce moment.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Voir tout Libreville</button></div>`;
+    return `<div class="state"><h2>Rien vers ${esc(state.place.nom)}</h2><p>Aucun signalement pour ce lieu en ce moment.</p><button type="button" class="btn btn-ghost" data-action="clear-place">${uiIcon("pin")} Tout Libreville</button></div>`;
   }
   const liste = listeActive();
   if (state.trajet) {
-    return `<div class="state"><h2>Rien sur ce trajet</h2><p>Aucun signalement entre ${esc(nomLieu(state.trajet.depart))} et ${esc(nomLieu(state.trajet.arrivee))}.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Tout Libreville</button></div>`;
+    return `<div class="state"><h2>Rien sur ce trajet</h2><p>Aucun signalement entre ${esc(nomLieu(state.trajet.depart))} et ${esc(nomLieu(state.trajet.arrivee))}.</p><button type="button" class="btn btn-ghost" data-action="clear-place">${uiIcon("pin")} Tout Libreville</button></div>`;
   }
   if (liste) {
-    return `<div class="state"><h2>Rien dans ${esc(liste.nom)}</h2><p>Aucun signalement pour les lieux de cette liste.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Tout Libreville</button></div>`;
+    return `<div class="state"><h2>Rien dans ${esc(liste.nom)}</h2><p>Aucun signalement pour les lieux de cette liste.</p><button type="button" class="btn btn-ghost" data-action="clear-place">${uiIcon("pin")} Tout Libreville</button></div>`;
   }
   if (state.filter !== "tous") {
     return `<div class="state"><h2>Rien pour ce filtre</h2><p>Aucun signalement de ce type pour le moment. Essayez un autre filtre, ou publiez ce que vous voyez sur la route.</p></div>`;
   }
-  return `<div class="state"><h2>La route est calme</h2><p>Aucun signalement à Libreville pour l'instant. Si vous voyez un bouchon, un accident ou un contrôle, prévenez les conducteurs derrière vous.</p><button type="button" class="btn btn-primary" data-action="compose">Signaler un incident</button></div>`;
+  return `<div class="state"><h2>La route est calme</h2><p>Aucun signalement à Libreville pour l'instant. Si une situation peut créer un bouchon, signalez-la.</p><button type="button" class="btn btn-primary" data-action="compose">${uiIcon("plus")} Signaler un incident</button></div>`;
 }
 
 function renderFeed() {
@@ -565,26 +726,33 @@ function renderFeed() {
         ? `Vers ${state.place.nom}`
         : (state.reports.length ? `Dernier signalement ${state.reports[0].relatif}` : "Libreville");
   const placeNote = state.trajet || liste || state.place
-    ? `<p class="sheet-place"><button type="button" data-action="clear-place">Tout Libreville</button></p>`
+    ? `<p class="sheet-place"><button type="button" data-action="clear-place">${uiIcon("pin", 14)} Tout Libreville</button></p>`
     : "";
+  const compteLabel = state.compte && state.compte.premium ? "Premium" : "Compte";
+  const compteIcon = state.compte && state.compte.premium ? "star" : "user";
   return `
-    <div class="sheet-head">
-      <div>
-        <h1>En ce moment</h1>
-        <p>${esc(subtitle)}</p>
-        ${placeNote}
+    <div class="feed-bar">
+      <div class="sheet-head">
+        <div>
+          <h1>En ce moment</h1>
+          <p>${esc(subtitle)}</p>
+          ${placeNote}
+        </div>
+        <div class="sheet-actions">
+          <button type="button" class="btn btn-ghost btn-compact" data-action="compte">${uiIcon(compteIcon)} ${compteLabel}</button>
+          <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("plus")} Signaler</button>
+        </div>
       </div>
-      <div class="sheet-actions">
-        <button type="button" class="btn btn-ghost btn-compact" data-action="compte">${state.compte && state.compte.premium ? "Premium" : "Compte"}</button>
-        <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
+      ${offlineNote()}
+      <div class="chips" role="toolbar" aria-label="Filtrer les signalements">
+        ${FILTERS.map((chip) => {
+          const icon = chip.id === "tous" ? uiIcon("layers", 14) : iconSvg(chip.id, 14);
+          return `<button type="button" class="chip" data-action="filter" data-filter="${chip.id}" aria-pressed="${state.filter === chip.id ? "true" : "false"}">${icon}<span>${esc(chip.label)}</span></button>`;
+        }).join("")}
       </div>
-    </div>
-    ${offlineNote()}
-    <div class="chips" role="toolbar" aria-label="Filtrer les signalements">
-      ${FILTERS.map((chip) => `<button type="button" class="chip" data-action="filter" data-filter="${chip.id}" aria-pressed="${state.filter === chip.id ? "true" : "false"}">${esc(chip.label)}</button>`).join("")}
     </div>
     ${items.length ? `<div class="list">${items.map(itemHtml).join("")}</div>` : emptyHtml()}
-    <p class="footer-note">Signalements manuels. Le suivi GPS, les listes et les alertes sont dans Premium.</p>`;
+    <p class="footer-note">Signalements manuels, sans suivi GPS. Les autres usagers de la route signalent toute situation susceptible de créer les bouchons.</p>`;
 }
 
 function renderLoading() {
@@ -609,33 +777,36 @@ function noteHtml(note) {
 function renderDetail() {
   const report = selected();
   if (!report) {
-    return `<div class="state"><h2>Signalement introuvable</h2><p>Il n'est plus dans la liste récente.</p><button type="button" class="btn btn-primary" data-action="back">Retour à la liste</button></div>`;
+    return `<div class="state"><h2>Signalement introuvable</h2><p>Il n'est plus dans la liste récente.</p><button type="button" class="btn btn-primary" data-action="back">${uiIcon("back")} Retour à la liste</button></div>`;
   }
   const style = styleOf(report.type);
   const notes = report.commentaires || [];
+  const hint = report.appuye
+    ? `${appuisPhrase(report.appuis)} Recliquez pour retirer la vôtre.`
+    : appuisPhrase(report.appuis);
   return `
     <div class="sheet-head">
-      <button type="button" class="btn btn-ghost btn-compact" data-action="back">Retour</button>
-      <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("back")} Retour</button>
+      <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("plus")} Signaler</button>
     </div>
     <article class="detail">
       <div class="detail-kicker">
-        <span class="type-pill" style="background:${style.pin};color:${style.chipText}">${esc(report.type_label)}</span>
+        <span class="type-pill" style="background:${style.pin};color:${style.chipText}">${iconSvg(report.type, 14)} ${esc(report.type_label)}</span>
         <span class="muted">${esc(report.relatif)}</span>
       </div>
       <h2>${esc(report.lieu)}</h2>
       <p class="detail-text">${esc(report.commentaire)}</p>
       <button type="button" class="appui${report.appuye ? " is-on" : ""}" data-action="appui" data-id="${report.id}" aria-pressed="${report.appuye ? "true" : "false"}" aria-label="${report.appuye ? "Confirmé" : "Confirmer"} ×${report.appuis}">
-        <span>${report.appuye ? "Confirmé" : "Confirmer"}</span>
+        <span>${uiIcon(report.appuye ? "check" : "plus")} ${report.appuye ? "Confirmé" : "Confirmer"}</span>
         <span class="appui-count">×${report.appuis}</span>
       </button>
-      <p class="appui-hint">${esc(appuisPhrase(report.appuis))}</p>
+      <p class="appui-hint">${esc(hint)}</p>
       <section class="notes" aria-label="Précisions">
         <h3>Précisions${notes.length ? ` <span>${notes.length}</span>` : ""}</h3>
         ${notes.length ? `<ul class="note-list">${notes.map(noteHtml).join("")}</ul>` : '<p class="muted">Aucune précision pour l\'instant. Ajoutez ce que vous voyez sur place.</p>'}
         <form id="comment-form" class="composer" novalidate>
           <input id="detail-commentaire" class="field${state.commentError ? " is-invalid" : ""}" type="text" maxlength="200" enterkeyhint="send" placeholder="Ajouter une précision…" value="${esc(state.detailDraft)}" ${state.commentSending ? "disabled" : ""}>
-          <button class="btn btn-primary btn-compact" type="submit" ${state.commentSending ? "disabled" : ""}>Envoyer</button>
+          <button class="btn btn-primary btn-compact" type="submit" ${state.commentSending ? "disabled" : ""}>${uiIcon("send")} Envoyer</button>
         </form>
         ${state.commentError ? `<p class="field-error">${esc(state.commentError)}</p>` : ""}
       </section>
@@ -650,10 +821,10 @@ function renderCompose() {
         <h1>Nouveau signalement</h1>
         <p>Visible tout de suite par les autres conducteurs.</p>
       </div>
-      <button type="button" class="btn btn-ghost btn-compact" data-action="back">Fermer</button>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("close")} Fermer</button>
     </div>
     <form id="compose-form" class="compose" novalidate>
-      <p class="field-label">Type d'incident</p>
+      <p class="field-label">${uiIcon("layers", 14)} Type d'incident</p>
       <div class="type-grid">
         ${boot.types.map((type) => {
           const style = styleOf(type.id);
@@ -662,21 +833,21 @@ function renderCompose() {
         }).join("")}
       </div>
       ${state.errors.type ? `<p class="field-error">${esc(state.errors.type)}</p>` : ""}
-      <label class="field-label" for="commentaire">Que se passe-t-il ?</label>
+      <label class="field-label" for="commentaire">${uiIcon("list", 14)} Que se passe-t-il ?</label>
       <textarea id="commentaire" class="field${state.errors.commentaire ? " is-invalid" : ""}" maxlength="280" placeholder="Ex. Deux files vers le marché, ça n'avance plus depuis le feu.">${esc(text)}</textarea>
       <div class="field-meta">
         <span>${state.errors.commentaire ? `<span class="field-error">${esc(state.errors.commentaire)}</span>` : "Une phrase suffit. Pas de nom, pas de numéro."}</span>
         <span id="commentaire-count">${text.trim().length}/280</span>
       </div>
-      <label class="field-label" for="lieu-select">Lieu approximatif</label>
+      <label class="field-label" for="lieu-select">${uiIcon("pin", 14)} Lieu approximatif</label>
       <select id="lieu-select" class="field${state.errors.lieu ? " is-invalid" : ""}">
         <option value="">Choisir un quartier connu</option>
         ${boot.lieux.map((lieu) => `<option value="${lieu.id}"${state.draft.lieuId === lieu.id ? " selected" : ""}>${esc(lieu.nom)}</option>`).join("")}
       </select>
-      <button type="button" class="btn btn-ghost btn-block pick-btn" data-action="pick">Choisir sur la carte</button>
+      <button type="button" class="btn btn-ghost btn-block pick-btn" data-action="pick">${uiIcon("pin")} Choisir sur la carte</button>
       <p class="chosen${state.draft.latitude != null ? " is-set" : ""}">${state.draft.latitude != null ? esc(state.draft.lieu) : "Ou touchez la carte pour placer le point."}</p>
       ${state.errors.lieu ? `<p class="field-error">${esc(state.errors.lieu)}</p>` : ""}
-      <button class="btn btn-primary btn-block" type="submit" ${state.saving ? "disabled" : ""}>${state.saving ? "Publication…" : "Publier le signalement"}</button>
+      <button class="btn btn-primary btn-block" type="submit" ${state.saving ? "disabled" : ""}>${uiIcon("send")} ${state.saving ? "Publication…" : "Publier le signalement"}</button>
     </form>`;
 }
 
@@ -744,17 +915,17 @@ function renderCompte() {
     return `
       <div class="sheet-head">
         <div><h1>Compte</h1><p>Pour suivre des lieux. La carte reste ouverte sans compte.</p></div>
-        <button type="button" class="btn btn-ghost btn-compact" data-action="back">Fermer</button>
+        <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("close")} Fermer</button>
       </div>
       <form id="compte-form" class="compose" novalidate>
-        <label class="field-label" for="compte-email">Email</label>
+        <label class="field-label" for="compte-email">${uiIcon("mail", 14)} Email</label>
         <input id="compte-email" class="field" type="email" autocomplete="username" inputmode="email" required value="${esc(state.compteEmail)}">
-        <label class="field-label" for="compte-mot">Mot de passe</label>
+        <label class="field-label" for="compte-mot">${uiIcon("lock", 14)} Mot de passe</label>
         <input id="compte-mot" class="field" type="password" autocomplete="current-password" minlength="8" required>
         ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
         <div class="sheet-actions compte-actions">
-          <button class="btn btn-primary" type="button" data-action="connexion" ${state.compteEnCours ? "disabled" : ""}>Se connecter</button>
-          <button class="btn btn-ghost" type="button" data-action="inscription" ${state.compteEnCours ? "disabled" : ""}>Créer un compte</button>
+          <button class="btn btn-primary" type="button" data-action="connexion" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("user")} Se connecter</button>
+          <button class="btn btn-ghost" type="button" data-action="inscription" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("plus")} Créer un compte</button>
         </div>
       </form>`;
   }
@@ -766,15 +937,15 @@ function renderCompte() {
     <article class="liste${state.listeId === liste.id ? " is-on" : ""}">
       <header>
         <h3>${esc(liste.nom)}</h3>
-        <button type="button" class="btn btn-ghost btn-compact" data-action="suivre-liste" data-id="${liste.id}">${state.listeId === liste.id ? "Suivie" : "Suivre"}</button>
+        <button type="button" class="btn btn-ghost btn-compact" data-action="suivre-liste" data-id="${liste.id}">${uiIcon(state.listeId === liste.id ? "check" : "pin")} ${state.listeId === liste.id ? "Suivie" : "Suivre"}</button>
       </header>
       <div class="liste-lieux">
         ${(liste.lieux || []).map((id) => `<button type="button" class="chip" data-action="retirer-lieu" data-liste="${liste.id}" data-lieu="${esc(id)}">${esc(nomLieu(id))} ×</button>`).join("") || '<p class="muted">Aucun lieu pour l’instant.</p>'}
       </div>
       <form class="liste-ajout" data-liste="${liste.id}">
         <select class="field" name="lieu_id" aria-label="Ajouter un lieu à ${esc(liste.nom)}">${options}</select>
-        <button class="btn btn-ghost btn-compact" type="submit">Ajouter</button>
-        <button type="button" class="btn btn-ghost btn-compact" data-action="supprimer-liste" data-id="${liste.id}">Supprimer</button>
+        <button class="btn btn-ghost btn-compact" type="submit">${uiIcon("plus")} Ajouter</button>
+        <button type="button" class="btn btn-ghost btn-compact" data-action="supprimer-liste" data-id="${liste.id}">${uiIcon("trash")} Supprimer</button>
       </form>
     </article>`).join("");
   return `
@@ -783,7 +954,7 @@ function renderCompte() {
         <h1>${premium ? "Premium" : "Compte"}</h1>
         <p>${esc(state.compte.email)}</p>
       </div>
-      <button type="button" class="btn btn-ghost btn-compact" data-action="sortie">Sortir</button>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="sortie">${uiIcon("logout")} Sortir</button>
     </div>
     <div class="compose">
       ${premium ? "" : `
@@ -800,42 +971,42 @@ function renderCompte() {
           </ul>
           <p class="muted">Le paiement mobile money n’est pas branché. Activer Premium ici enregistre le droit sur ce serveur, sans débit.</p>
           ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
-          <button type="button" class="btn btn-primary btn-block" data-action="premium" ${state.compteEnCours ? "disabled" : ""}>Activer Premium</button>
+          <button type="button" class="btn btn-primary btn-block" data-action="premium" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("star")} Activer Premium</button>
         </section>`}
       ${premium ? `
         <section>
-          <h2 class="field-label">Listes de lieux</h2>
+          <h2 class="field-label">${uiIcon("list", 14)} Listes de lieux</h2>
           ${listesHtml || '<p class="muted">Créez une liste, par exemple Matin ou Famille.</p>'}
           <form id="nouvelle-liste" class="liste-ajout">
             <input class="field" name="nom" maxlength="40" placeholder="Nom de la liste" aria-label="Nom de la liste">
-            <button class="btn btn-primary btn-compact" type="submit">Créer</button>
+            <button class="btn btn-primary btn-compact" type="submit">${uiIcon("plus")} Créer</button>
           </form>
         </section>
         <section>
-          <h2 class="field-label">Trajet</h2>
+          <h2 class="field-label">${uiIcon("route", 14)} Trajet</h2>
           <form id="trajet-form" class="trajet">
             <select class="field" name="depart" aria-label="Départ">${options}</select>
             <select class="field" name="arrivee" aria-label="Arrivée">${options}</select>
-            <button class="btn btn-primary btn-compact" type="submit">${state.trajet ? "Trajet suivi" : "Suivre ce trajet"}</button>
-            ${state.trajet ? '<button type="button" class="btn btn-ghost btn-compact" data-action="oublier-trajet">Effacer</button>' : ""}
+            <button class="btn btn-primary btn-compact" type="submit">${uiIcon("route")} ${state.trajet ? "Trajet suivi" : "Suivre ce trajet"}</button>
+            ${state.trajet ? `<button type="button" class="btn btn-ghost btn-compact" data-action="oublier-trajet">${uiIcon("close")} Effacer</button>` : ""}
           </form>
         </section>
         <section class="reglages">
-          <h2 class="field-label">Alertes</h2>
-          <label class="check"><input type="checkbox" data-reglage="visuel" ${reglages.visuel ? "checked" : ""}> Alertes visuelles</label>
-          <label class="check"><input type="checkbox" data-reglage="son" ${reglages.son ? "checked" : ""}> Alertes sonores</label>
-          <label class="check"><input type="checkbox" data-reglage="gps" ${reglages.gps ? "checked" : ""}> GPS et alerte à l’approche</label>
-          <label class="check"><input type="checkbox" data-reglage="conduite" ${reglages.conduite ? "checked" : ""}> Mode conduite</label>
-          <label class="check"><input type="checkbox" data-reglage="heures" ${reglages.heures ? "checked" : ""}> Seulement aux heures de vigilance</label>
+          <h2 class="field-label">${uiIcon("bell", 14)} Alertes</h2>
+          <label class="check"><input type="checkbox" data-reglage="visuel" ${reglages.visuel ? "checked" : ""}><span>${uiIcon("bell")} Alertes visuelles</span></label>
+          <label class="check"><input type="checkbox" data-reglage="son" ${reglages.son ? "checked" : ""}><span>${uiIcon("volume")} Alertes sonores</span></label>
+          <label class="check"><input type="checkbox" data-reglage="gps" ${reglages.gps ? "checked" : ""}><span>${uiIcon("locate")} GPS et alerte à l’approche</span></label>
+          <label class="check"><input type="checkbox" data-reglage="conduite" ${reglages.conduite ? "checked" : ""}><span>${uiIcon("car")} Mode conduite</span></label>
+          <label class="check"><input type="checkbox" data-reglage="heures" ${reglages.heures ? "checked" : ""}><span>${uiIcon("clock")} Seulement aux heures de vigilance</span></label>
           <div class="heures">
             <input class="field" type="time" data-heure="debut" value="${esc(reglages.debut)}">
             <input class="field" type="time" data-heure="fin" value="${esc(reglages.fin)}">
             <input class="field" type="time" data-heure="debut2" value="${esc(reglages.debut2)}">
             <input class="field" type="time" data-heure="fin2" value="${esc(reglages.fin2)}">
           </div>
-          <button type="button" class="btn btn-ghost btn-block" data-action="silence">Silence pendant 2 heures</button>
+          <button type="button" class="btn btn-ghost btn-block" data-action="silence">${uiIcon("moon")} Silence pendant 2 heures</button>
         </section>` : ""}
-      <button type="button" class="btn btn-ghost btn-block" data-action="back">Retour à la carte</button>
+      <button type="button" class="btn btn-ghost btn-block" data-action="back">${uiIcon("back")} Retour à la carte</button>
     </div>`;
 }
 
@@ -900,6 +1071,7 @@ function selectReport(id) {
   state.mode = "detail";
   state.returnMode = "feed";
   state.picking = false;
+  state.tendanceOuverte = false;
   state.commentError = "";
   if (!isDesktop() && visiblePx() < snapPoints()[1] - 12) setVisible(snapPoints()[1]);
   history.replaceState(null, "", `#s-${id}`);
@@ -1021,13 +1193,12 @@ async function publish(event) {
 
 async function support(id) {
   const current = state.reports.find((item) => item.id === id);
-  if (!current || current.appuye) {
-    toast("Vous avez déjà confirmé ce signalement.");
-    return;
-  }
+  if (!current) return;
+  const retirait = !!current.appuye;
   try {
     const data = await api(`/api/signalements/${id}/appui/`, { method: "POST" });
     upsert(data.signalement);
+    if (retirait && data.signalement && !data.signalement.appuye) toast("Confirmation retirée.");
     render();
   } catch (error) {
     toast(messageFrom(error, "La confirmation n'a pas pu être enregistrée."));
@@ -1565,11 +1736,22 @@ function bind() {
     else chooseSearchReport(Number(hit.dataset.id));
   });
   document.addEventListener("pointerdown", (event) => {
-    if (!state.searchOpen || event.target.closest("#search")) return;
-    setSearchOpen(false);
+    if (state.searchOpen && !event.target.closest("#search")) setSearchOpen(false);
+    if (state.tendanceOuverte && !event.target.closest("#tendance-wrap")) {
+      state.tendanceOuverte = false;
+      renderChrome();
+    }
   });
   document.getElementById("tendance").addEventListener("click", () => {
-    if (state.tendance && state.tendance.focus_id) selectReport(state.tendance.focus_id);
+    if (!state.tendance) return;
+    state.tendanceOuverte = !state.tendanceOuverte;
+    renderChrome();
+  });
+  document.getElementById("tendance-panel").addEventListener("click", (event) => {
+    const hit = event.target.closest(".tendance-hit");
+    if (!hit) return;
+    state.tendanceOuverte = false;
+    selectReport(Number(hit.dataset.id));
   });
   document.getElementById("pick-cancel").addEventListener("click", () => {
     state.picking = false;
@@ -1580,6 +1762,11 @@ function bind() {
     if (event.key !== "Escape") return;
     if (state.searchOpen) {
       setSearchOpen(false);
+      return;
+    }
+    if (state.tendanceOuverte) {
+      state.tendanceOuverte = false;
+      renderChrome();
       return;
     }
     if (state.picking) {

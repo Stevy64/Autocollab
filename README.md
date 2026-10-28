@@ -70,7 +70,8 @@ Chaque processus écrit une ligne JSON sur la sortie d’erreur, logger `wayize`
 | `boundary.read` | `appuis`, `commentaires` | lecture du signalement visé |
 | `signalement.created` | `signalements` | création : id, type, lieu, longueur du texte |
 | `signalement.rejected` / `signalement.rate_limited` | `signalements` | validation ou plafond de 8 par heure |
-| `appui.recorded` | `appuis` | appui, et s’il est nouveau |
+| `appui.recorded` / `appui.removed` | `appuis` | confirmation ajoutée ou retirée |
+| `signalement.expired` | `signalements` | alertes de plus de trois heures retirées, nombre seulement |
 | `commentaire.created` | `commentaires` | précision : id et longueur, pas le texte |
 | `error` | les deux | exception, type et message court |
 
@@ -80,9 +81,9 @@ L’en-tête de réponse `X-Request-Id` est le même des deux côtés, ce qui re
 
 - Carte centrée sur Libreville, fond OpenStreetMap.
 - Signalement manuel : type, phrase courte, quartier connu ou point posé sur la carte.
-- Appui (une fois par navigateur) et précisions courtes, avec les compteurs.
-- Liste des signalements récents, qui recentre la carte.
-- Tendance des quatre dernières heures.
+- Confirmation, que l'on peut retirer, et précisions courtes, avec les compteurs.
+- Liste des signalements récents, qui recentre la carte. Un signalement disparaît au bout de trois heures.
+- Tendance des trois dernières heures, repliable.
 - États vide, chargement et erreur. Téléphone et bureau.
 - PWA : manifeste, service worker, icônes. Sur `localhost`, le navigateur peut proposer l’installation.
 
