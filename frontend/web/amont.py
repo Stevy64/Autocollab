@@ -12,6 +12,7 @@ from django.conf import settings
 from .journal import journal
 
 _CLE = re.compile(r"^[A-Za-z0-9]{8,64}$")
+_JETON = re.compile(r"^[a-f0-9]{32}$")
 
 CADRE_SECOURS = {
     "lieux": [],
@@ -41,6 +42,9 @@ def appeler(request, chemin, method=None, body=None, content_type=None):
         "X-Request-Id": request_id,
         "X-Wayize-Session": identite(request),
     }
+    jeton = request.headers.get("X-Wayize-Compte", "")
+    if _JETON.match(jeton):
+        headers["X-Wayize-Compte"] = jeton
     data = body
     if data:
         headers["Content-Type"] = content_type or "application/json"

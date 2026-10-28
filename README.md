@@ -1,6 +1,6 @@
 # Wayizé
 
-Carte de circulation pour les conducteurs de Libreville. On y signale un bouchon, un accident, des travaux, un contrôle ou une route barrée, et les autres peuvent appuyer le signalement ou ajouter une précision. Pas de compte, pas de suivi GPS : le lieu se choisit sur la carte ou parmi les quartiers connus.
+Carte de circulation pour les conducteurs de Libreville. On y signale un bouchon, un accident, des travaux, un contrôle ou une route barrée, et les autres peuvent appuyer le signalement ou ajouter une précision. La carte reste ouverte sans compte. Un compte permet de suivre des listes de lieux. Premium ajoute un trajet, des alertes, le GPS et un mode conduite ; l’activer ici n’effectue aucun débit.
 
 Wayizé is a mobile-first map for drivers in Libreville, Gabon. People report traffic incidents by hand. Reports, supports, and comments live in Django’s default SQLite file, behind a small HTTP API.
 
@@ -15,13 +15,14 @@ frontend/                 carte PWA (Django), port 8647
 backend/                  API, port 8648 (loopback)
   wayize_api/             réglages, comme gabomazone_api
   apps/signalements/      signalements, graine, cadre de carte
+  apps/comptes/           comptes, listes de lieux, droit Premium
   apps/appuis/            un appui par navigateur
   apps/commentaires/      précisions
   apps/lieux/             quartiers connus
 nginx.conf                le même découpage / et /api, si un jour un proxy externe est utile
 ```
 
-Les applications de l’API lisent les signalements dans le même processus et la même base SQLite, comme le panier Gabomazone importe le modèle Produit. Comptes, JWT, paiements, PostgreSQL, Redis et Celery ne sont pas repris : cette carte n’en a pas besoin.
+Les applications de l’API lisent les signalements dans le même processus et la même base SQLite. Un compte facultatif garde des listes de lieux. Premium (trajet, alertes, GPS, mode conduite) s’active sur ce serveur sans débit : le paiement mobile money n’est pas branché. Le téléphone garde le dernier flux dans son stockage local.
 
 ## Lancer en local
 
@@ -89,7 +90,7 @@ Le fuseau horaire est `Africa/Libreville`. L’interface est en français.
 
 ## Hors périmètre
 
-Pas de comptes, pas de paiement, pas de géolocalisation continue. La clé secrète par défaut ne sert qu’en local ; en dehors de cette machine, définir `DJANGO_SECRET_KEY` (une valeur par processus, ou la même, elle n’est pas journalisée).
+Le paiement mobile money n’est pas branché : activer Premium enregistre le droit, sans débit. La clé secrète par défaut ne sert qu’en local ; en dehors de cette machine, définir `DJANGO_SECRET_KEY` (une valeur par processus, ou la même, elle n’est pas journalisée).
 
 ## Crédits
 

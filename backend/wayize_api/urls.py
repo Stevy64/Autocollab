@@ -9,4 +9,5 @@ urlpatterns = [
     path("api/signalements/", include("apps.commentaires.urls")),
     path("api/lieux/", include("apps.lieux.urls")),
     path("api/carte/", include("apps.signalements.carte_urls")),
+    path("api/comptes/", include("apps.comptes.urls")),
 ]

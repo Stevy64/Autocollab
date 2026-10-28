@@ -124,11 +124,10 @@ class WebSliceTests(SimpleTestCase):
         script = (Path(__file__).resolve().parent / "static" / "trafic" / "js" / "app.js").read_text(encoding="utf-8")
         self.assertIn("tile.openstreetmap.fr/osmfr/", script)
         self.assertNotIn("tile.openstreetmap.org", script)
-        self.assertIn("Confirmé", script)
-        self.assertIn("Confirmer", script)
-        self.assertNotIn("Appuyé", script)
-        self.assertNotIn("Appuyer", script)
-        self.assertIn("search-toggle", script)
+        self.assertIn("×${n}", script)
+        self.assertIn("wayize.memoire.v1", script)
+        self.assertIn("Activer Premium", script)
+        self.assertNotIn("${n}×", script)
 
     def test_proxy_forwards_the_anonymous_session_not_the_cookie(self):
         with self.assertLogs("wayize", level="INFO") as captured:

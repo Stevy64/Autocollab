@@ -57,6 +57,14 @@ const state = {
   markerKey: "",
   place: null,
   searchOpen: false,
+  compte: null,
+  jeton: "",
+  listeId: null,
+  trajet: null,
+  reglages: null,
+  compteErreur: "",
+  compteEnCours: false,
+  compteEmail: "",
 };
 
 function esc(value) {
@@ -82,6 +90,47 @@ function csrf() {
   return meta ? meta.content : "";
 }
 
+const CLE_MEMOIRE = "wayize.memoire.v1";
+
+function reglagesDefaut() {
+  return {
+    son: true,
+    visuel: true,
+    gps: false,
+    conduite: false,
+    heures: false,
+    debut: "06:00",
+    fin: "09:00",
+    debut2: "16:00",
+    fin2: "20:00",
+    silenceJusqua: 0,
+  };
+}
+
+function lireMemoire() {
+  try {
+    const data = JSON.parse(localStorage.getItem(CLE_MEMOIRE) || "{}");
+    return data && typeof data === "object" ? data : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function ecrireMemoire(partiel) {
+  const suivant = { ...lireMemoire(), ...partiel, enregistre_le: Date.now() };
+  try {
+    localStorage.setItem(CLE_MEMOIRE, JSON.stringify(suivant));
+  } catch (error) {
+    // Le quota du téléphone peut refuser l'écriture : l'app continue sans cache.
+  }
+  return suivant;
+}
+
+function assurerReglages() {
+  if (!state.reglages) state.reglages = reglagesDefaut();
+  return state.reglages;
+}
+
 function prefersReduced() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
@@ -100,7 +149,7 @@ function homeZoom() {
 
 function appuisCourt(n) {
   if (!n) return "pas confirmé";
-  return `${n}×`;
+  return `×${n}`;
 }
 
 function appuisPhrase(n) {
@@ -135,6 +184,8 @@ function toast(message) {
 async function api(url, options = {}) {
   const method = options.method || "GET";
   const headers = { Accept: "application/json" };
+  const jeton = state.jeton || "";
+  if (/^[a-f0-9]{32}$/.test(jeton)) headers["X-Wayize-Compte"] = jeton;
   if (method !== "GET" && method !== "HEAD") headers["X-CSRFToken"] = csrf();
   if (options.body) headers["Content-Type"] = "application/json";
   let response;
@@ -247,6 +298,51 @@ function reportMatchesPlace(report, place) {
   return haversine(report.latitude, report.longitude, place.latitude, place.longitude) <= 1.2;
 }
 
+function lieuParId(id) {
+  return boot.lieux.find((lieu) => lieu.id === id) || null;
+}
+
+function listeActive() {
+  if (!state.compte || !state.listeId) return null;
+  return (state.compte.listes || []).find((liste) => liste.id === state.listeId) || null;
+}
+
+function reportMatchesListe(report) {
+  const liste = listeActive();
+  if (!liste) return true;
+  return (liste.lieux || []).some((id) => {
+    const lieu = lieuParId(id);
+    return lieu && reportMatchesPlace(report, lieu);
+  });
+}
+
+function versMetres(latitude, longitude) {
+  return {
+    x: longitude * 111320 * Math.cos((0.4 * Math.PI) / 180),
+    y: latitude * 110540,
+  };
+}
+
+function distanceSegmentKm(latitude, longitude, depart, arrivee) {
+  const point = versMetres(latitude, longitude);
+  const a = versMetres(depart.latitude, depart.longitude);
+  const b = versMetres(arrivee.latitude, arrivee.longitude);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = dx * dx + dy * dy || 1;
+  let t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / len;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy)) / 1000;
+}
+
+function reportMatchesTrajet(report) {
+  if (!state.trajet) return true;
+  const depart = lieuParId(state.trajet.depart);
+  const arrivee = lieuParId(state.trajet.arrivee);
+  if (!depart || !arrivee || report.latitude == null) return false;
+  return distanceSegmentKm(report.latitude, report.longitude, depart, arrivee) <= 1.5;
+}
+
 function nearestLieu(latitude, longitude) {
   let best = null;
   let bestKm = 1.4;
@@ -263,6 +359,8 @@ function nearestLieu(latitude, longitude) {
 function visibleReports() {
   return state.reports.filter((report) => {
     if (state.filter !== "tous" && report.type !== state.filter) return false;
+    if (state.trajet && !reportMatchesTrajet(report)) return false;
+    if (state.listeId && !reportMatchesListe(report)) return false;
     return reportMatchesPlace(report, state.place);
   });
 }
@@ -443,6 +541,13 @@ function emptyHtml() {
   if (state.place) {
     return `<div class="state"><h2>Rien vers ${esc(state.place.nom)}</h2><p>Aucun signalement pour ce lieu en ce moment.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Voir tout Libreville</button></div>`;
   }
+  const liste = listeActive();
+  if (state.trajet) {
+    return `<div class="state"><h2>Rien sur ce trajet</h2><p>Aucun signalement entre ${esc(nomLieu(state.trajet.depart))} et ${esc(nomLieu(state.trajet.arrivee))}.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Tout Libreville</button></div>`;
+  }
+  if (liste) {
+    return `<div class="state"><h2>Rien dans ${esc(liste.nom)}</h2><p>Aucun signalement pour les lieux de cette liste.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Tout Libreville</button></div>`;
+  }
   if (state.filter !== "tous") {
     return `<div class="state"><h2>Rien pour ce filtre</h2><p>Aucun signalement de ce type pour le moment. Essayez un autre filtre, ou publiez ce que vous voyez sur la route.</p></div>`;
   }
@@ -451,10 +556,15 @@ function emptyHtml() {
 
 function renderFeed() {
   const items = visibleReports();
-  const subtitle = state.place
-    ? `Vers ${state.place.nom}`
-    : (state.reports.length ? `Dernier signalement ${state.reports[0].relatif}` : "Libreville");
-  const placeNote = state.place
+  const liste = listeActive();
+  const subtitle = state.trajet
+    ? `Trajet ${nomLieu(state.trajet.depart)} → ${nomLieu(state.trajet.arrivee)}`
+    : liste
+      ? `Liste ${liste.nom}`
+      : state.place
+        ? `Vers ${state.place.nom}`
+        : (state.reports.length ? `Dernier signalement ${state.reports[0].relatif}` : "Libreville");
+  const placeNote = state.trajet || liste || state.place
     ? `<p class="sheet-place"><button type="button" data-action="clear-place">Tout Libreville</button></p>`
     : "";
   return `
@@ -464,14 +574,17 @@ function renderFeed() {
         <p>${esc(subtitle)}</p>
         ${placeNote}
       </div>
-      <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
+      <div class="sheet-actions">
+        <button type="button" class="btn btn-ghost btn-compact" data-action="compte">${state.compte && state.compte.premium ? "Premium" : "Compte"}</button>
+        <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
+      </div>
     </div>
     ${offlineNote()}
     <div class="chips" role="toolbar" aria-label="Filtrer les signalements">
       ${FILTERS.map((chip) => `<button type="button" class="chip" data-action="filter" data-filter="${chip.id}" aria-pressed="${state.filter === chip.id ? "true" : "false"}">${esc(chip.label)}</button>`).join("")}
     </div>
     ${items.length ? `<div class="list">${items.map(itemHtml).join("")}</div>` : emptyHtml()}
-    <p class="footer-note">Signalements manuels, sans suivi GPS. Les conducteurs de Libreville préviennent ceux qui arrivent derrière.</p>`;
+    <p class="footer-note">Signalements manuels. Le suivi GPS, les listes et les alertes sont dans Premium.</p>`;
 }
 
 function renderLoading() {
@@ -512,9 +625,9 @@ function renderDetail() {
       </div>
       <h2>${esc(report.lieu)}</h2>
       <p class="detail-text">${esc(report.commentaire)}</p>
-      <button type="button" class="appui${report.appuye ? " is-on" : ""}" data-action="appui" data-id="${report.id}" aria-pressed="${report.appuye ? "true" : "false"}" aria-label="${report.appuye ? "Confirmé" : "Confirmer"} ${report.appuis} fois">
+      <button type="button" class="appui${report.appuye ? " is-on" : ""}" data-action="appui" data-id="${report.id}" aria-pressed="${report.appuye ? "true" : "false"}" aria-label="${report.appuye ? "Confirmé" : "Confirmer"} ×${report.appuis}">
         <span>${report.appuye ? "Confirmé" : "Confirmer"}</span>
-        <span class="appui-count">${report.appuis}×</span>
+        <span class="appui-count">×${report.appuis}</span>
       </button>
       <p class="appui-hint">${esc(appuisPhrase(report.appuis))}</p>
       <section class="notes" aria-label="Précisions">
@@ -567,12 +680,172 @@ function renderCompose() {
     </form>`;
 }
 
+function nomLieu(id) {
+  const lieu = lieuParId(id);
+  return lieu ? lieu.nom : id;
+}
+
+function dansLesHeures() {
+  const reglages = assurerReglages();
+  if (!reglages.heures) return true;
+  if (reglages.silenceJusqua && Date.now() < reglages.silenceJusqua) return false;
+  const maintenant = new Date();
+  const minutes = maintenant.getHours() * 60 + maintenant.getMinutes();
+  const vers = (valeur) => {
+    const [h, m] = String(valeur || "00:00").split(":");
+    return Number(h) * 60 + Number(m || 0);
+  };
+  const couvre = (debut, fin) => {
+    const a = vers(debut);
+    const b = vers(fin);
+    if (Number.isNaN(a) || Number.isNaN(b)) return true;
+    return a <= b ? minutes >= a && minutes <= b : minutes >= a || minutes <= b;
+  };
+  return couvre(reglages.debut, reglages.fin) || couvre(reglages.debut2, reglages.fin2);
+}
+
+function correspondVeille(report) {
+  if (state.trajet) return reportMatchesTrajet(report);
+  if (state.listeId) return reportMatchesListe(report);
+  return false;
+}
+
+function bip() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  const ctx = new AudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.value = 740;
+  gain.gain.value = 0.05;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+  osc.stop(ctx.currentTime + 0.24);
+  osc.onended = () => ctx.close();
+}
+
+function alerter(phrase) {
+  const reglages = assurerReglages();
+  if (!dansLesHeures()) return;
+  if (reglages.visuel !== false) {
+    toast(phrase);
+    if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+      new Notification("Wayizé", { body: phrase, silent: true });
+    }
+  }
+  if (reglages.son) bip();
+}
+
+function renderCompte() {
+  if (!state.compte) {
+    return `
+      <div class="sheet-head">
+        <div><h1>Compte</h1><p>Pour suivre des lieux. La carte reste ouverte sans compte.</p></div>
+        <button type="button" class="btn btn-ghost btn-compact" data-action="back">Fermer</button>
+      </div>
+      <form id="compte-form" class="compose" novalidate>
+        <label class="field-label" for="compte-email">Email</label>
+        <input id="compte-email" class="field" type="email" autocomplete="username" inputmode="email" required value="${esc(state.compteEmail)}">
+        <label class="field-label" for="compte-mot">Mot de passe</label>
+        <input id="compte-mot" class="field" type="password" autocomplete="current-password" minlength="8" required>
+        ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
+        <div class="sheet-actions compte-actions">
+          <button class="btn btn-primary" type="button" data-action="connexion" ${state.compteEnCours ? "disabled" : ""}>Se connecter</button>
+          <button class="btn btn-ghost" type="button" data-action="inscription" ${state.compteEnCours ? "disabled" : ""}>Créer un compte</button>
+        </div>
+      </form>`;
+  }
+  const premium = state.compte.premium;
+  const listes = state.compte.listes || [];
+  const reglages = assurerReglages();
+  const options = boot.lieux.map((lieu) => `<option value="${esc(lieu.id)}">${esc(lieu.nom)}</option>`).join("");
+  const listesHtml = listes.map((liste) => `
+    <article class="liste${state.listeId === liste.id ? " is-on" : ""}">
+      <header>
+        <h3>${esc(liste.nom)}</h3>
+        <button type="button" class="btn btn-ghost btn-compact" data-action="suivre-liste" data-id="${liste.id}">${state.listeId === liste.id ? "Suivie" : "Suivre"}</button>
+      </header>
+      <div class="liste-lieux">
+        ${(liste.lieux || []).map((id) => `<button type="button" class="chip" data-action="retirer-lieu" data-liste="${liste.id}" data-lieu="${esc(id)}">${esc(nomLieu(id))} ×</button>`).join("") || '<p class="muted">Aucun lieu pour l’instant.</p>'}
+      </div>
+      <form class="liste-ajout" data-liste="${liste.id}">
+        <select class="field" name="lieu_id" aria-label="Ajouter un lieu à ${esc(liste.nom)}">${options}</select>
+        <button class="btn btn-ghost btn-compact" type="submit">Ajouter</button>
+        <button type="button" class="btn btn-ghost btn-compact" data-action="supprimer-liste" data-id="${liste.id}">Supprimer</button>
+      </form>
+    </article>`).join("");
+  return `
+    <div class="sheet-head">
+      <div>
+        <h1>${premium ? "Premium" : "Compte"}</h1>
+        <p>${esc(state.compte.email)}</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="sortie">Sortir</button>
+    </div>
+    <div class="compose">
+      ${premium ? "" : `
+        <section class="offre">
+          <h2>Personnaliser, 1 500 F / mois</h2>
+          <ul>
+            <li>Listes de quartiers à suivre</li>
+            <li>Trajet domicile–travail, signalements sur le chemin</li>
+            <li>Alertes visuelles et sonores</li>
+            <li>GPS : alerte quand vous approchez d’un lieu suivi</li>
+            <li>Heures de vigilance, le matin et le soir</li>
+            <li>Mode conduite, texte plus grand</li>
+            <li>Silence de deux heures</li>
+          </ul>
+          <p class="muted">Le paiement mobile money n’est pas branché. Activer Premium ici enregistre le droit sur ce serveur, sans débit.</p>
+          ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
+          <button type="button" class="btn btn-primary btn-block" data-action="premium" ${state.compteEnCours ? "disabled" : ""}>Activer Premium</button>
+        </section>`}
+      ${premium ? `
+        <section>
+          <h2 class="field-label">Listes de lieux</h2>
+          ${listesHtml || '<p class="muted">Créez une liste, par exemple Matin ou Famille.</p>'}
+          <form id="nouvelle-liste" class="liste-ajout">
+            <input class="field" name="nom" maxlength="40" placeholder="Nom de la liste" aria-label="Nom de la liste">
+            <button class="btn btn-primary btn-compact" type="submit">Créer</button>
+          </form>
+        </section>
+        <section>
+          <h2 class="field-label">Trajet</h2>
+          <form id="trajet-form" class="trajet">
+            <select class="field" name="depart" aria-label="Départ">${options}</select>
+            <select class="field" name="arrivee" aria-label="Arrivée">${options}</select>
+            <button class="btn btn-primary btn-compact" type="submit">${state.trajet ? "Trajet suivi" : "Suivre ce trajet"}</button>
+            ${state.trajet ? '<button type="button" class="btn btn-ghost btn-compact" data-action="oublier-trajet">Effacer</button>' : ""}
+          </form>
+        </section>
+        <section class="reglages">
+          <h2 class="field-label">Alertes</h2>
+          <label class="check"><input type="checkbox" data-reglage="visuel" ${reglages.visuel ? "checked" : ""}> Alertes visuelles</label>
+          <label class="check"><input type="checkbox" data-reglage="son" ${reglages.son ? "checked" : ""}> Alertes sonores</label>
+          <label class="check"><input type="checkbox" data-reglage="gps" ${reglages.gps ? "checked" : ""}> GPS et alerte à l’approche</label>
+          <label class="check"><input type="checkbox" data-reglage="conduite" ${reglages.conduite ? "checked" : ""}> Mode conduite</label>
+          <label class="check"><input type="checkbox" data-reglage="heures" ${reglages.heures ? "checked" : ""}> Seulement aux heures de vigilance</label>
+          <div class="heures">
+            <input class="field" type="time" data-heure="debut" value="${esc(reglages.debut)}">
+            <input class="field" type="time" data-heure="fin" value="${esc(reglages.fin)}">
+            <input class="field" type="time" data-heure="debut2" value="${esc(reglages.debut2)}">
+            <input class="field" type="time" data-heure="fin2" value="${esc(reglages.fin2)}">
+          </div>
+          <button type="button" class="btn btn-ghost btn-block" data-action="silence">Silence pendant 2 heures</button>
+        </section>` : ""}
+      <button type="button" class="btn btn-ghost btn-block" data-action="back">Retour à la carte</button>
+    </div>`;
+}
+
 function renderSheet() {
   const root = document.getElementById("sheet-content");
   let html;
   if (state.loading && !state.loaded) html = renderLoading();
   else if (state.error && !state.loaded) html = renderError();
   else if (state.mode === "compose") html = renderCompose();
+  else if (state.mode === "compte") html = renderCompte();
   else if (state.mode === "detail") html = renderDetail();
   else html = renderFeed();
   root.innerHTML = html;
@@ -586,6 +859,7 @@ function render() {
   setTitle();
   document.body.classList.toggle("is-picking", state.picking);
   document.body.classList.toggle("is-compose", state.mode === "compose");
+  document.body.classList.toggle("is-driving", !!(state.compte && state.compte.premium && assurerReglages().conduite));
   const banner = document.getElementById("pick-banner");
   if (banner) banner.hidden = !state.picking;
   if (state.searchOpen) renderSearchResults();
@@ -791,20 +1065,23 @@ async function sendComment(event) {
 }
 
 async function reload() {
-  const first = !state.loaded;
-  if (first) {
+  const precedents = state.reports.slice();
+  const avaitUnCache = state.loaded;
+  if (!state.loaded) {
     state.loading = true;
     state.error = null;
     render();
   }
   try {
     const data = await api("/api/signalements/");
+    if (avaitUnCache) surveiller(precedents, data.signalements || []);
     state.reports = data.signalements;
     state.tendance = data.tendance;
     state.loaded = true;
     state.loading = false;
     state.error = null;
     state.markerKey = "";
+    ecrireMemoire({ feed: { signalements: data.signalements, tendance: data.tendance } });
     render();
     applyHashOnce();
   } catch (error) {
@@ -818,16 +1095,31 @@ async function reload() {
   }
 }
 
+function surveiller(precedents, suivants) {
+  if (!state.compte || !state.compte.premium) return;
+  if (!state.listeId && !state.trajet) return;
+  const connus = new Set(precedents.map((report) => report.id));
+  const frais = suivants.filter((report) => !connus.has(report.id) && correspondVeille(report));
+  if (!frais.length) return;
+  const phrase = frais.length === 1
+    ? `${frais[0].type_label} vers ${frais[0].lieu}`
+    : `${frais.length} nouveaux signalements sur votre veille`;
+  alerter(phrase);
+}
+
 async function quietRefresh() {
-  if (document.hidden || state.mode === "compose" || state.picking || state.saving || state.commentSending) return;
+  if (document.hidden || state.mode === "compose" || state.mode === "compte" || state.picking || state.saving || state.commentSending) return;
   const active = document.activeElement;
   if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) return;
   try {
+    const precedents = state.reports.slice();
     const data = await api("/api/signalements/");
+    if (precedents.length) surveiller(precedents, data.signalements || []);
     state.reports = data.signalements;
     state.tendance = data.tendance;
     state.loaded = true;
     state.markerKey = "";
+    ecrireMemoire({ feed: { signalements: data.signalements, tendance: data.tendance } });
     if (state.mode === "detail" && !selected()) {
       state.mode = "feed";
       state.selectedId = null;
@@ -849,7 +1141,10 @@ function applyHashOnce() {
 
 function clearPlace() {
   state.place = null;
+  state.listeId = null;
+  state.trajet = null;
   state.markerKey = "";
+  ecrireMemoire({ listeActive: null, trajet: null });
   if (map) map.flyTo([boot.centre.latitude, boot.centre.longitude], homeZoom(), { duration: motion() });
   render();
 }
@@ -879,7 +1174,7 @@ function renderSearchResults() {
     return `<li><button type="button" class="search-hit" role="option" data-kind="lieu" data-id="${esc(lieu.id)}"><strong>${esc(lieu.nom)}</strong><span>${meta}</span></button></li>`;
   }).join("");
   const reportHtml = reports.map((report) => (
-    `<li><button type="button" class="search-hit" role="option" data-kind="report" data-id="${report.id}"><strong>${esc(report.lieu)}</strong><span>${esc(report.type_label)} · ${esc(report.relatif)} · ${report.appuis}×</span></button></li>`
+    `<li><button type="button" class="search-hit" role="option" data-kind="report" data-id="${report.id}"><strong>${esc(report.lieu)}</strong><span>${esc(report.type_label)} · ${esc(report.relatif)} · ×${report.appuis}</span></button></li>`
   )).join("");
   if (!placeHtml && !reportHtml) {
     list.innerHTML = `<li class="search-empty">${query ? "Aucun lieu pour cette recherche." : "Tapez un quartier ou un lieu."}</li>`;
@@ -930,6 +1225,221 @@ function chooseSearchReport(id) {
   selectReport(id);
 }
 
+let gpsWatch = 0;
+let dernierGpsLieu = "";
+
+function reglerGps() {
+  if (gpsWatch && navigator.geolocation) navigator.geolocation.clearWatch(gpsWatch);
+  gpsWatch = 0;
+  const reglages = assurerReglages();
+  if (!reglages.gps || !state.compte || !state.compte.premium || !navigator.geolocation) return;
+  gpsWatch = navigator.geolocation.watchPosition((position) => {
+    const latitude = position.coords.latitude;
+    const longitude = position.coords.longitude;
+    const proche = boot.lieux.find((lieu) => haversine(latitude, longitude, lieu.latitude, lieu.longitude) <= 1.2);
+    if (!proche || proche.id === dernierGpsLieu) return;
+    const liste = listeActive();
+    const suivi = liste && liste.lieux.includes(proche.id);
+    const trajet = state.trajet && (state.trajet.depart === proche.id || state.trajet.arrivee === proche.id);
+    if (!suivi && !trajet) return;
+    dernierGpsLieu = proche.id;
+    alerter(`Vous approchez de ${proche.nom}.`);
+  }, () => {}, { enableHighAccuracy: false, maximumAge: 20000, timeout: 12000 });
+}
+
+function memoriserSession() {
+  ecrireMemoire({
+    jeton: state.jeton,
+    compte: state.compte,
+    listeActive: state.listeId,
+    trajet: state.trajet,
+    reglages: assurerReglages(),
+  });
+}
+
+function appliquerCompte(compte, jeton) {
+  state.compte = compte;
+  if (jeton) state.jeton = jeton;
+  memoriserSession();
+  document.body.classList.toggle("is-driving", !!(compte && compte.premium && assurerReglages().conduite));
+  reglerGps();
+}
+
+async function chargerCompte() {
+  if (!state.jeton) return;
+  try {
+    const data = await api("/api/comptes/moi/");
+    appliquerCompte(data.compte);
+    if (state.mode === "compte") render();
+  } catch (error) {
+    if (error.status === 401) {
+      state.jeton = "";
+      state.compte = null;
+      memoriserSession();
+    }
+  }
+}
+
+function ouvrirCompte() {
+  state.mode = "compte";
+  state.compteErreur = "";
+  state.picking = false;
+  if (!isDesktop()) setVisible(snapPoints()[2]);
+  render();
+}
+
+async function envoyerCompte(inscription) {
+  const email = (document.getElementById("compte-email") || {}).value || "";
+  const mot = (document.getElementById("compte-mot") || {}).value || "";
+  state.compteEmail = email.trim();
+  state.compteEnCours = true;
+  state.compteErreur = "";
+  render();
+  try {
+    const data = await api(inscription ? "/api/comptes/inscription/" : "/api/comptes/connexion/", {
+      method: "POST",
+      body: JSON.stringify({ email, mot_de_passe: mot }),
+    });
+    state.compteEnCours = false;
+    appliquerCompte(data.compte, data.jeton);
+    toast(inscription ? "Compte créé." : "Vous êtes connecté.");
+    render();
+  } catch (error) {
+    state.compteEnCours = false;
+    const champs = error.data && error.data.erreurs;
+    state.compteErreur = (champs && (champs.email || champs.mot_de_passe)) || messageFrom(error, "Le compte n'a pas répondu.");
+    render();
+  }
+}
+
+async function activerPremium() {
+  state.compteEnCours = true;
+  state.compteErreur = "";
+  render();
+  try {
+    const data = await api("/api/comptes/premium/", { method: "POST", body: "{}" });
+    state.compteEnCours = false;
+    appliquerCompte(data.compte);
+    toast("Premium est actif. Rien n'a été débité.");
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+    render();
+  } catch (error) {
+    state.compteEnCours = false;
+    state.compteErreur = messageFrom(error, "Premium n'a pas pu être activé.");
+    render();
+  }
+}
+
+function sortir() {
+  state.compte = null;
+  state.jeton = "";
+  state.listeId = null;
+  state.trajet = null;
+  assurerReglages().gps = false;
+  assurerReglages().conduite = false;
+  reglerGps();
+  memoriserSession();
+  state.mode = "feed";
+  state.markerKey = "";
+  render();
+}
+
+async function creerListe(nom) {
+  const data = await api("/api/comptes/listes/", { method: "POST", body: JSON.stringify({ nom }) });
+  appliquerCompte(data.compte);
+  render();
+}
+
+async function ajouterLieuListe(listeId, lieuId) {
+  const data = await api(`/api/comptes/listes/${listeId}/lieux/`, {
+    method: "POST",
+    body: JSON.stringify({ lieu_id: lieuId }),
+  });
+  appliquerCompte(data.compte);
+  render();
+}
+
+async function retirerLieuListe(listeId, lieuId) {
+  const data = await api(`/api/comptes/listes/${listeId}/lieux/${lieuId}/`, { method: "DELETE" });
+  appliquerCompte(data.compte);
+  render();
+}
+
+async function supprimerListe(id) {
+  const data = await api(`/api/comptes/listes/${id}/`, { method: "DELETE" });
+  if (state.listeId === id) state.listeId = null;
+  appliquerCompte(data.compte);
+  render();
+}
+
+function suivreListe(id) {
+  state.listeId = state.listeId === id ? null : Number(id);
+  state.trajet = null;
+  state.place = null;
+  state.markerKey = "";
+  memoriserSession();
+  state.mode = "feed";
+  if (!isDesktop()) setVisible(snapPoints()[1]);
+  const liste = listeActive();
+  const premier = liste && liste.lieux.length ? lieuParId(liste.lieux[0]) : null;
+  if (premier && map) map.flyTo([premier.latitude, premier.longitude], 14, { duration: motion() });
+  render();
+}
+
+function suivreTrajet(depart, arrivee) {
+  if (!depart || !arrivee || depart === arrivee) {
+    toast("Choisissez deux lieux différents.");
+    return;
+  }
+  state.trajet = { depart, arrivee };
+  state.listeId = null;
+  state.place = null;
+  state.markerKey = "";
+  memoriserSession();
+  state.mode = "feed";
+  const a = lieuParId(depart);
+  const b = lieuParId(arrivee);
+  if (a && b && map) {
+    map.fitBounds([[a.latitude, a.longitude], [b.latitude, b.longitude]], { padding: [40, 40] });
+  }
+  if (!isDesktop()) setVisible(snapPoints()[1]);
+  render();
+}
+
+function changerReglage(nom, valeur) {
+  const reglages = assurerReglages();
+  reglages[nom] = valeur;
+  memoriserSession();
+  document.body.classList.toggle("is-driving", !!(state.compte && state.compte.premium && reglages.conduite));
+  if (nom === "visuel" && valeur && "Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
+  if (nom === "gps") {
+    if (valeur && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        if (map) map.flyTo([position.coords.latitude, position.coords.longitude], 15, { duration: motion() });
+      }, () => toast("La position n'est pas disponible."));
+    }
+    reglerGps();
+  }
+}
+
+function restaurerMemoire() {
+  const memoire = lireMemoire();
+  state.jeton = typeof memoire.jeton === "string" ? memoire.jeton : "";
+  state.reglages = { ...reglagesDefaut(), ...(memoire.reglages || {}) };
+  state.listeId = memoire.listeActive || null;
+  state.trajet = memoire.trajet || null;
+  if (memoire.compte && memoire.compte.email) state.compte = memoire.compte;
+  if (memoire.feed && Array.isArray(memoire.feed.signalements)) {
+    state.reports = memoire.feed.signalements;
+    state.tendance = memoire.feed.tendance || null;
+    state.loaded = true;
+  }
+}
+
 function onSheetClick(event) {
   const el = event.target.closest("[data-action]");
   if (!el) return;
@@ -943,15 +1453,56 @@ function onSheetClick(event) {
   else if (action === "appui") support(Number(el.dataset.id));
   else if (action === "retry") reload();
   else if (action === "clear-place") clearPlace();
+  else if (action === "compte") ouvrirCompte();
+  else if (action === "connexion") envoyerCompte(false);
+  else if (action === "inscription") envoyerCompte(true);
+  else if (action === "premium") activerPremium();
+  else if (action === "sortie") sortir();
+  else if (action === "suivre-liste") suivreListe(Number(el.dataset.id));
+  else if (action === "supprimer-liste") supprimerListe(Number(el.dataset.id));
+  else if (action === "retirer-lieu") retirerLieuListe(Number(el.dataset.liste), el.dataset.lieu);
+  else if (action === "oublier-trajet") {
+    state.trajet = null;
+    state.markerKey = "";
+    memoriserSession();
+    render();
+  } else if (action === "silence") {
+    assurerReglages().silenceJusqua = Date.now() + 2 * 60 * 60 * 1000;
+    memoriserSession();
+    toast("Alertes en silence pour 2 heures.");
+  }
 }
 
 function onSubmit(event) {
   if (event.target.id === "compose-form") publish(event);
   else if (event.target.id === "comment-form") sendComment(event);
+  else if (event.target.id === "nouvelle-liste") {
+    event.preventDefault();
+    const nom = new FormData(event.target).get("nom");
+    creerListe(String(nom || "")).catch((error) => toast(messageFrom(error, "La liste n'a pas pu être créée.")));
+  } else if (event.target.classList.contains("liste-ajout") && event.target.dataset.liste) {
+    event.preventDefault();
+    const lieu = new FormData(event.target).get("lieu_id");
+    ajouterLieuListe(Number(event.target.dataset.liste), String(lieu || "")).catch((error) => {
+      toast(messageFrom(error, "Le lieu n'a pas pu être ajouté."));
+    });
+  } else if (event.target.id === "trajet-form") {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    suivreTrajet(String(data.get("depart") || ""), String(data.get("arrivee") || ""));
+  } else if (event.target.id === "compte-form") {
+    event.preventDefault();
+    envoyerCompte(false);
+  }
 }
 
 function onChange(event) {
   if (event.target.id === "lieu-select") chooseLieu(event.target.value);
+  if (event.target.dataset.reglage) changerReglage(event.target.dataset.reglage, event.target.checked);
+  if (event.target.dataset.heure) {
+    assurerReglages()[event.target.dataset.heure] = event.target.value;
+    memoriserSession();
+  }
 }
 
 function onInput(event) {
@@ -996,10 +1547,7 @@ function bind() {
   sheet.addEventListener("change", onChange);
   sheet.addEventListener("input", onInput);
   document.getElementById("recenter").addEventListener("click", () => {
-    state.place = null;
-    state.markerKey = "";
-    map.flyTo([boot.centre.latitude, boot.centre.longitude], homeZoom(), { duration: motion() });
-    render();
+    clearPlace();
   });
   document.getElementById("search-toggle").addEventListener("click", () => setSearchOpen(true));
   document.getElementById("search-close").addEventListener("click", () => setSearchOpen(false));
@@ -1053,10 +1601,13 @@ function bind() {
 
 function start() {
   boot = JSON.parse(document.getElementById("boot-data").textContent);
+  restaurerMemoire();
   initMap();
   bind();
   if (!isDesktop()) setVisible(visiblePx());
+  render();
   reload();
+  chargerCompte().then(() => reglerGps());
   window.setInterval(quietRefresh, 45000);
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});

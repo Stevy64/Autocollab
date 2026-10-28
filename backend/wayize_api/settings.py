@@ -1,4 +1,4 @@
-"""Réglages de l'API Wayizé. Pas de compte, pas de session, pas de service externe."""
+"""Réglages de l'API Wayizé. Comptes et listes sont dans l'application comptes."""
 
 import os
 from pathlib import Path
@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "apps.appuis.apps.AppuisConfig",
     "apps.commentaires.apps.CommentairesConfig",
     "apps.lieux.apps.LieuxConfig",
+    "apps.comptes.apps.ComptesConfig",
 ]
 
 MIDDLEWARE = [
