@@ -16,6 +16,7 @@ backend/                  API, port 8648 (loopback)
   wayize_api/             réglages, comme gabomazone_api
   apps/signalements/      signalements, graine, cadre de carte
   apps/comptes/           comptes, listes de lieux, droit Premium
+  apps/pilotage/          réglages de la carte et console d'administration
   apps/appuis/            un appui par navigateur
   apps/commentaires/      précisions
   apps/lieux/             quartiers connus
@@ -69,11 +70,15 @@ Chaque processus écrit une ligne JSON sur la sortie d’erreur, logger `wayize`
 | `boundary.error` | `web` | l’API ne répond pas |
 | `boundary.read` | `appuis`, `commentaires` | lecture du signalement visé |
 | `signalement.created` | `signalements` | création : id, type, lieu, longueur du texte |
-| `signalement.rejected` / `signalement.rate_limited` | `signalements` | validation ou plafond de 8 par heure |
+| `signalement.rejected` / `signalement.rate_limited` | `signalements` | validation ou plafond horaire (8 par défaut) |
 | `appui.recorded` / `appui.removed` | `appuis` | confirmation ajoutée ou retirée |
 | `degage.recorded` / `degage.removed` | `appuis` | un usager dit que c'est dégagé, ou retire son vote |
-| `signalement.cleared` | `appuis` | deux votes « dégagé » retirent l'alerte |
-| `signalement.expired` | `signalements` | alertes de plus de trois heures retirées, nombre seulement |
+| `signalement.cleared` | `appuis` | autant de votes « dégagé » que le seuil (2 par défaut) retirent l'alerte |
+| `signalement.expired` | `signalements` | alertes plus vieilles que la durée réglée (3 h par défaut), nombre seulement |
+| `signalement.removed` | `pilotage` | un administrateur retire un signalement, id seulement |
+| `admin.login` / `admin.bootstrapped` | `pilotage` | entrée dans la console, id du compte seulement |
+| `reglages.updated` | `pilotage` | durée, seuil « dégagé » et plafond horaire |
+| `compte.updated` | `pilotage` | droit Premium ou administration, id seulement |
 | `commentaire.created` | `commentaires` | précision : id et longueur, pas le texte |
 | `error` | les deux | exception, type et message court |
 
@@ -84,8 +89,9 @@ L’en-tête de réponse `X-Request-Id` est le même des deux côtés, ce qui re
 - Carte centrée sur Libreville, fond OpenStreetMap.
 - Signalement manuel : type, phrase courte, quartier de la liste ou nom saisi, avec un point sur la carte si le nom est nouveau.
 - Confirmation, que l'on peut retirer, et précisions courtes, avec les compteurs.
-- Liste des signalements récents, qui recentre la carte. Un signalement disparaît au bout de trois heures. Deux usagers qui disent « c'est dégagé » le retirent tout de suite ; un seul vote reste visible.
-- Tendance des trois dernières heures, en cercle, qui se déploie en barre.
+- Liste des signalements récents, qui recentre la carte. Une alerte disparaît au bout de trois heures (réglable). Deux usagers qui disent « c'est dégagé » la retirent tout de suite ; un seul vote reste visible. Le seuil est réglable.
+- Administration sur `/admin/` : aperçu, signalements, comptes, durée de vie, seuil « dégagé » et plafond horaire. S'il n'y a pas encore d'administrateur, le premier compte qui se connecte le devient.
+- Tendance sur la durée de vie des alertes, en cercle, qui se déploie en barre.
 - États vide, chargement et erreur. Téléphone et bureau.
 - PWA : manifeste, service worker, icônes. Sur `localhost`, le navigateur peut proposer l’installation.
 

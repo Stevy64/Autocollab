@@ -10,17 +10,16 @@ from apps.http import erreur, lire_json, nombre, protege, reponse, texte_propre
 from apps.identite import cle_session
 from apps.journal import journal, request_id
 
+from apps.pilotage.reglages import lire
+
 from .geo import CENTRE, EST, LIEUX, NORD, OUEST, SUD, dans_libreville
 from .models import Signalement
 from .present import signalement_public, tendance
 
-MAX_PAR_HEURE = 8
-DUREE_ALERTE = timedelta(hours=3)
-
 
 def purger_expires():
-    """Une alerte vit trois heures, puis elle quitte la base."""
-    seuil = timezone.now() - DUREE_ALERTE
+    """Une alerte vit le nombre d'heures réglé, puis elle quitte la base."""
+    seuil = timezone.now() - timedelta(hours=lire()["duree_heures"])
     anciens = Signalement.objects.filter(cree_le__lte=seuil)
     nombre_retires = anciens.count()
     if not nombre_retires:
@@ -128,13 +127,16 @@ def lister(request):
     identifiants = [item.id for item in items]
     appuyes = ids_appuyes(cle, identifiants)
     degages = ids_degages(cle, identifiants)
+    reglage = lire()
     return reponse(
         {
             "signalements": [
                 signalement_public(item, item.id in appuyes, item.id in degages)
                 for item in items
             ],
-            "tendance": tendance(items),
+            "tendance": tendance(items, heures=reglage["duree_heures"]),
+            "duree_heures": reglage["duree_heures"],
+            "seuil_degage": reglage["seuil_degage"],
         }
     )
 
@@ -196,7 +198,7 @@ def creer(request):
     depuis = timezone.now() - timedelta(hours=1)
     if (
         Signalement.objects.filter(session_cle=cle, cree_le__gte=depuis).count()
-        >= MAX_PAR_HEURE
+        >= lire()["plafond_heure"]
     ):
         journal(
             "signalements",

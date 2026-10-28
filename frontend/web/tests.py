@@ -55,12 +55,43 @@ class _Api(BaseHTTPRequestHandler):
         if self.path.startswith("/api/sante/"):
             self._send(200, {"service": "api", "ok": True})
             return
+        if self.path.startswith("/api/admin/apercu"):
+            self._send(
+                200,
+                {
+                    "signalements": 3,
+                    "comptes": 1,
+                    "premium": 0,
+                    "admins": 1,
+                    "appuis": 4,
+                    "degages": 1,
+                    "en_retrait": 0,
+                    "par_type": [{"id": "bouchon", "label": "Bouchon", "n": 2}],
+                    "semaine": [{"label": "mer.", "n": 2, "pct": 100, "date": "2026-10-28"}],
+                    "reglages": {"duree_heures": 3, "seuil_degage": 2, "plafond_heure": 8},
+                },
+            )
+            return
         self._send(404, {"message": "introuvable"})
 
     def do_POST(self):
         self._noter()
         length = int(self.headers.get("Content-Length", "0") or 0)
         self.rfile.read(length)
+        if self.path.startswith("/api/admin/entree"):
+            self._send(
+                200,
+                {
+                    "compte": {
+                        "id": 7,
+                        "email": "ada@wayize.ga",
+                        "est_admin": True,
+                        "premium": False,
+                    },
+                    "jeton": "0123456789abcdef0123456789abcdef",
+                },
+            )
+            return
         self._send(201, {"signalement": {"id": 1, "lieu": "Glass"}})
 
     def log_message(self, fmt, *args):
@@ -135,6 +166,8 @@ class WebSliceTests(SimpleTestCase):
         self.assertIn("lieu-saisie", script)
         self.assertIn("lieux-connus", script)
         self.assertIn('uiIcon("alarm")', script)
+        self.assertIn('href="/admin/"', script)
+        self.assertIn("state.compte.est_admin", script)
         self.assertNotIn("conducteurs confirment", script)
         self.assertNotIn("${n}×", script)
         self.assertNotIn("déjà confirmé", script)
@@ -166,3 +199,36 @@ class WebSliceTests(SimpleTestCase):
         ):
             self.assertTrue((root / name).is_file(), name)
             self.assertGreater((root / name).stat().st_size, 400, name)
+
+    def test_admin_console_keeps_the_token_out_of_the_page(self):
+        jeton = "0123456789abcdef0123456789abcdef"
+        porte = self.client.get("/admin/connexion/")
+        self.assertEqual(porte.status_code, 200)
+        self.assertContains(porte, "premier compte")
+        self.assertContains(porte, "Entrer")
+        self.assertNotContains(porte, jeton)
+        accueil = self.client.get("/admin/")
+        self.assertEqual(accueil.status_code, 302)
+        self.assertIn("/admin/connexion/", accueil["Location"])
+
+        with self.assertLogs("wayize", level="INFO") as captured:
+            entree = self.client.post(
+                "/admin/connexion/",
+                {"email": "ada@wayize.ga", "mot_de_passe": "libreville"},
+            )
+        self.assertEqual(entree.status_code, 302)
+        self.assertNotIn(jeton, entree.content.decode())
+        journal = "\n".join(captured.output)
+        self.assertNotIn(jeton, journal)
+        self.assertNotIn("libreville", journal)
+
+        board = self.client.get("/admin/")
+        self.assertEqual(board.status_code, 200)
+        self.assertContains(board, "Vue d’ensemble")
+        self.assertContains(board, "ada@wayize.ga")
+        self.assertNotContains(board, jeton)
+        self.assertEqual(board["Cache-Control"], "no-store")
+
+        self.client.post("/admin/sortie/")
+        ferme = self.client.get("/admin/")
+        self.assertEqual(ferme.status_code, 302)

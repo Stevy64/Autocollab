@@ -8,4 +8,9 @@ def presenter(compte):
                 "lieux": [suivi.lieu_id for suivi in liste.suivis.all()],
             }
         )
-    return {"email": compte.email, "premium": compte.premium, "listes": listes}
+    return {
+        "email": compte.email,
+        "premium": compte.premium,
+        "est_admin": compte.est_admin,
+        "listes": listes,
+    }

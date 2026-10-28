@@ -1,0 +1,90 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e7edf2">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}Administration — Wayizé{% endblock %}</title>
+  <link rel="icon" href="{% static 'trafic/icons/favicon-32.png' %}" sizes="32x32" type="image/png">
+  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}">
+</head>
+<body class="wa">
+  <a class="wa-skip" href="#contenu">Aller au contenu</a>
+  <div class="wa-scrim" data-nav-close hidden></div>
+  <aside class="wa-sidebar" data-side>
+    <a class="wa-brand" href="{% url 'admin-apercu' %}">
+      <span class="wa-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 20.2s-5.4-5-5.4-9.1a5.4 5.4 0 0 1 10.8 0c0 4.1-5.4 9.1-5.4 9.1z" fill="#fff"/><circle cx="12" cy="11" r="1.8" fill="#e10600"/></svg>
+      </span>
+      <span class="wa-brand-copy">
+        <strong>Wayizé</strong>
+        <small>Administration</small>
+      </span>
+    </a>
+    <button class="wa-collapse" type="button" data-collapse aria-label="Réduire le menu">
+      {% include "admin/icone.html" with name="chevron" %}
+    </button>
+    <nav class="wa-nav" aria-label="Administration">
+      <a class="wa-nav-item{% if nav == 'apercu' %} is-active{% endif %}" href="{% url 'admin-apercu' %}" {% if nav == 'apercu' %}aria-current="page"{% endif %} title="Vue d’ensemble">
+        <span class="wa-ico">{% include "admin/icone.html" with name="grid" %}</span>
+        <span class="wa-label">Vue d’ensemble</span>
+      </a>
+      <a class="wa-nav-item{% if nav == 'signalements' %} is-active{% endif %}" href="{% url 'admin-signalements' %}" {% if nav == 'signalements' %}aria-current="page"{% endif %} title="Signalements">
+        <span class="wa-ico">{% include "admin/icone.html" with name="pin" %}</span>
+        <span class="wa-label">Signalements</span>
+      </a>
+      <a class="wa-nav-item{% if nav == 'comptes' %} is-active{% endif %}" href="{% url 'admin-comptes' %}" {% if nav == 'comptes' %}aria-current="page"{% endif %} title="Comptes">
+        <span class="wa-ico">{% include "admin/icone.html" with name="users" %}</span>
+        <span class="wa-label">Comptes</span>
+      </a>
+      <a class="wa-nav-item{% if nav == 'reglages' %} is-active{% endif %}" href="{% url 'admin-reglages' %}" {% if nav == 'reglages' %}aria-current="page"{% endif %} title="Réglages">
+        <span class="wa-ico">{% include "admin/icone.html" with name="sliders" %}</span>
+        <span class="wa-label">Réglages</span>
+      </a>
+    </nav>
+    <div class="wa-sidefoot">
+      <a class="wa-nav-item" href="/" title="Retour à la carte">
+        <span class="wa-ico">{% include "admin/icone.html" with name="map" %}</span>
+        <span class="wa-label">Retour à la carte</span>
+      </a>
+      <form method="post" action="{% url 'admin-sortie' %}">
+        {% csrf_token %}
+        <button class="wa-nav-item" type="submit" title="Déconnexion">
+          <span class="wa-ico">{% include "admin/icone.html" with name="logout" %}</span>
+          <span class="wa-label">Déconnexion</span>
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="wa-app">
+    <header class="wa-topbar">
+      <button class="wa-burger" type="button" data-nav aria-label="Ouvrir le menu">
+        <span></span><span></span><span></span>
+      </button>
+      <a class="wa-brand wa-brand-mobile" href="{% url 'admin-apercu' %}">
+        <span class="wa-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 20.2s-5.4-5-5.4-9.1a5.4 5.4 0 0 1 10.8 0c0 4.1-5.4 9.1-5.4 9.1z" fill="#fff"/><circle cx="12" cy="11" r="1.8" fill="#e10600"/></svg>
+        </span>
+        <span class="wa-brand-copy"><strong>Wayizé</strong><small>Administration</small></span>
+      </a>
+      <div class="wa-user">
+        <span class="wa-avatar" aria-hidden="true">{{ initiale }}</span>
+        <span class="wa-user-mail">{{ email }}</span>
+      </div>
+    </header>
+    <main class="wa-main" id="contenu">
+      {% if flash %}
+      <div class="wa-flash{% if flash.erreur %} is-error{% endif %}" role="status">{{ flash.texte }}</div>
+      {% endif %}
+      {% if panne %}
+      <div class="wa-flash is-error" role="alert">{{ panne }}</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script src="{% static 'trafic/js/admin.js' %}"></script>
+</body>
+</html>

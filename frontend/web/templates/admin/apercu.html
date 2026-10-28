@@ -1,0 +1,75 @@
+{% extends "admin/base.html" %}
+{% block title %}Vue d’ensemble — Wayizé{% endblock %}
+{% block content %}
+<header class="wa-hero">
+  <div>
+    <p class="wa-kicker">Pilotage</p>
+    <h1>Vue d’ensemble</h1>
+    <p class="wa-lead">Ce qui est sur la carte en ce moment, et les règles qui le font vivre.</p>
+  </div>
+  <div class="wa-hero-actions">
+    <a class="wa-btn wa-btn-dark" href="{% url 'admin-signalements' %}">Signalements</a>
+    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-comptes' %}">Comptes</a>
+    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-reglages' %}">Réglages</a>
+  </div>
+</header>
+
+{% if not vide %}
+<section class="wa-metrics" aria-label="Indicateurs">
+  <article class="wa-metric">
+    <span class="wa-metric-label">Signalements</span>
+    <strong>{{ signalements_n }}</strong>
+    <span class="wa-metric-sub">{{ en_retrait }} en cours de retrait</span>
+  </article>
+  <article class="wa-metric">
+    <span class="wa-metric-label">Comptes</span>
+    <strong>{{ comptes_n }}</strong>
+    <span class="wa-metric-sub">{{ premium_n }} premium · {{ admins_n }} admin{{ admins_n|pluralize }}</span>
+  </article>
+  <article class="wa-metric">
+    <span class="wa-metric-label">Confirmations</span>
+    <strong>{{ appuis_n }}</strong>
+    <span class="wa-metric-sub">{{ degages_n }} vote{{ degages_n|pluralize }} « dégagé »</span>
+  </article>
+  <article class="wa-metric is-ink">
+    <span class="wa-metric-label">Durée d’une alerte</span>
+    <strong>{{ reglages.duree_heures }} h</strong>
+    <span class="wa-metric-sub">{{ reglages.seuil_degage }} votes pour retirer · {{ reglages.plafond_heure }} / h</span>
+  </article>
+</section>
+
+<div class="wa-grid">
+  <section class="wa-card">
+    <div class="wa-card-head">
+      <div>
+        <p class="wa-kicker">Sept jours</p>
+        <h2>Signalements encore en base</h2>
+      </div>
+    </div>
+    <div class="wa-bars" role="img" aria-label="Signalements des sept derniers jours">
+      {% for jour in semaine %}
+      <div class="wa-bar" title="{{ jour.date }} : {{ jour.n }}">
+        <span class="wa-bar-val">{{ jour.n }}</span>
+        <div class="wa-bar-track"><div class="wa-bar-fill" style="height: {{ jour.pct }}%"></div></div>
+        <span class="wa-bar-lab">{{ jour.label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="wa-card">
+    <div class="wa-card-head">
+      <div>
+        <p class="wa-kicker">Types</p>
+        <h2>Répartition</h2>
+      </div>
+      <a class="wa-text-link" href="{% url 'admin-signalements' %}">Voir la liste</a>
+    </div>
+    <ul class="wa-split">
+      {% for ligne in par_type %}
+      <li><span>{{ ligne.label }}</span><strong>{{ ligne.n }}</strong></li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

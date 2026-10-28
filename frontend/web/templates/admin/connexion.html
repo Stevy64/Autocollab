@@ -1,0 +1,44 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e7edf2">
+  <meta name="robots" content="noindex">
+  <title>Connexion — Administration Wayizé</title>
+  <link rel="icon" href="{% static 'trafic/icons/favicon-32.png' %}" sizes="32x32" type="image/png">
+  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}">
+</head>
+<body class="wa wa-auth">
+  <main class="wa-login">
+    <a class="wa-login-brand" href="/">
+      <span class="wa-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 20.2s-5.4-5-5.4-9.1a5.4 5.4 0 0 1 10.8 0c0 4.1-5.4 9.1-5.4 9.1z" fill="#fff"/><circle cx="12" cy="11" r="1.8" fill="#e10600"/></svg>
+      </span>
+      <span>Wayizé</span>
+    </a>
+    <section class="wa-card wa-login-card">
+      <p class="wa-kicker">Administration</p>
+      <h1>Entrer dans la console</h1>
+      <p class="wa-lead">Pilotage de la carte : signalements, comptes et règles. Rien ici ne suit un trajet.</p>
+      {% if flash %}
+      <div class="wa-flash{% if flash.erreur %} is-error{% endif %}" role="status">{{ flash.texte }}</div>
+      {% endif %}
+      {% if erreur %}
+      <div class="wa-flash is-error" role="alert">{{ erreur }}</div>
+      {% endif %}
+      <form method="post" action="{% url 'admin-connexion' %}" class="wa-form">
+        {% csrf_token %}
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" inputmode="email" required maxlength="254" value="{{ email }}">
+        <label for="mot">Mot de passe</label>
+        <input id="mot" name="mot_de_passe" type="password" autocomplete="current-password" required minlength="8" maxlength="72">
+        <button class="wa-btn wa-btn-dark wa-btn-block" type="submit">Entrer</button>
+      </form>
+      <p class="wa-note">S’il n’y a encore aucun administrateur, le premier compte Wayizé qui se connecte ici le devient. Ensuite, seuls les administrateurs entrent. Le compte se crée sur la carte.</p>
+      <a class="wa-text-link" href="/">Retour à la carte</a>
+    </section>
+  </main>
+</body>
+</html>

@@ -32,7 +32,7 @@ def identite(request):
     return cle
 
 
-def appeler(request, chemin, method=None, body=None, content_type=None):
+def appeler(request, chemin, method=None, body=None, content_type=None, jeton=None):
     """chemin commence par /api/. Retourne (status, octets, content_type)."""
     method = method or request.method
     request_id = getattr(request, "wayize_request_id", "") or ""
@@ -42,8 +42,9 @@ def appeler(request, chemin, method=None, body=None, content_type=None):
         "X-Request-Id": request_id,
         "X-Wayize-Session": identite(request),
     }
-    jeton = request.headers.get("X-Wayize-Compte", "")
-    if _JETON.match(jeton):
+    if jeton is None:
+        jeton = request.headers.get("X-Wayize-Compte", "")
+    if _JETON.match(jeton or ""):
         headers["X-Wayize-Compte"] = jeton
     data = body
     if data:

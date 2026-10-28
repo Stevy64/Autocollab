@@ -1,0 +1,323 @@
+"""Console d'administration. Le jeton n'est jamais journalisé."""
+
+from datetime import timedelta
+
+from django.db import transaction
+from django.db.models import Count, Q
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
+
+from apps.appuis.models import Appui, Degage
+from apps.comptes.models import Compte
+from apps.comptes.secrets import correspond, email_propre
+from apps.comptes.views import _compte
+from apps.http import erreur, lire_json, protege, reponse, texte_propre
+from apps.journal import journal, request_id
+from apps.signalements.models import Signalement
+from apps.signalements.present import relatif
+
+from .reglages import (
+    DUREE_MAX,
+    DUREE_MIN,
+    PLAFOND_MAX,
+    PLAFOND_MIN,
+    SEUIL_MAX,
+    SEUIL_MIN,
+    courant,
+    lire,
+)
+
+_JOURS = ("lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim.")
+
+
+def _entier(valeur, bas, haut):
+    if isinstance(valeur, bool):
+        return None
+    if isinstance(valeur, float) and not valeur.is_integer():
+        return None
+    if isinstance(valeur, str):
+        propre = valeur.strip()
+        if not propre.isdigit():
+            return None
+        valeur = propre
+    try:
+        n = int(valeur)
+    except (TypeError, ValueError):
+        return None
+    if n < bas or n > haut:
+        return None
+    return n
+
+
+def _drapeau(valeur):
+    return valeur is True or valeur in (1, "1", "true", "on")
+
+
+def _quand(moment):
+    return timezone.localtime(moment).strftime("%d/%m/%Y · %H:%M")
+
+
+def _fiche(compte):
+    return {
+        "id": compte.id,
+        "email": compte.email,
+        "premium": bool(compte.premium),
+        "est_admin": bool(compte.est_admin),
+        "cree_le": compte.cree_le.isoformat(),
+        "quand": _quand(compte.cree_le),
+    }
+
+
+def _exiger_admin(request):
+    compte = _compte(request)
+    if compte is None:
+        return None, erreur("Connectez-vous pour continuer.", status=401)
+    if not compte.est_admin:
+        return None, erreur("Cet espace est réservé à l'administration.", status=403)
+    return compte, None
+
+
+def _semaine():
+    maintenant = timezone.localtime()
+    aujourd = maintenant.date()
+    debut = maintenant.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=6)
+    seaux = {}
+    for cree_le in Signalement.objects.filter(cree_le__gte=debut).values_list("cree_le", flat=True):
+        jour = timezone.localtime(cree_le).date()
+        seaux[jour] = seaux.get(jour, 0) + 1
+    jours = []
+    for decalage in range(6, -1, -1):
+        jour = aujourd - timedelta(days=decalage)
+        jours.append(
+            {
+                "label": _JOURS[jour.weekday()],
+                "n": seaux.get(jour, 0),
+                "date": jour.isoformat(),
+            }
+        )
+    maximum = max((jour["n"] for jour in jours), default=0) or 1
+    for jour in jours:
+        if jour["n"] <= 0:
+            jour["pct"] = 0
+        else:
+            jour["pct"] = max(8, round(100 * jour["n"] / maximum))
+    return jours
+
+
+@protege("pilotage")
+@require_http_methods(["POST"])
+def entree(request):
+    data, message = lire_json(request)
+    if message:
+        return erreur(message)
+    email = email_propre(data.get("email"))
+    mot = data.get("mot_de_passe") if isinstance(data.get("mot_de_passe"), str) else ""
+    compte = Compte.objects.filter(email=email).first() if email else None
+    if compte is None or not correspond(mot, compte.secret):
+        return erreur("Email ou mot de passe incorrect.", status=401)
+    promu = False
+    with transaction.atomic():
+        verrou = Compte.objects.select_for_update().get(pk=compte.pk)
+        if not verrou.est_admin:
+            if Compte.objects.filter(est_admin=True).exists():
+                return erreur("Cet espace est réservé à l'administration.", status=403)
+            verrou.est_admin = True
+            verrou.save(update_fields=["est_admin"])
+            promu = True
+        compte = verrou
+    if promu:
+        journal(
+            "pilotage",
+            "admin.bootstrapped",
+            request_id=request_id(request),
+            compte_id=compte.id,
+        )
+    journal("pilotage", "admin.login", request_id=request_id(request), compte_id=compte.id)
+    return reponse({"compte": _fiche(compte), "jeton": compte.jeton})
+
+
+@protege("pilotage")
+@require_http_methods(["GET"])
+def apercu(request):
+    _admin, refus = _exiger_admin(request)
+    if refus:
+        return refus
+    par_type_brut = {
+        row["type"]: row["n"]
+        for row in Signalement.objects.values("type").annotate(n=Count("id"))
+    }
+    return reponse(
+        {
+            "signalements": Signalement.objects.count(),
+            "comptes": Compte.objects.count(),
+            "premium": Compte.objects.filter(premium=True).count(),
+            "admins": Compte.objects.filter(est_admin=True).count(),
+            "appuis": Appui.objects.count(),
+            "degages": Degage.objects.count(),
+            "en_retrait": Signalement.objects.filter(degages__isnull=False).distinct().count(),
+            "par_type": [
+                {"id": value, "label": label, "n": par_type_brut.get(value, 0)}
+                for value, label in Signalement.Type.choices
+            ],
+            "semaine": _semaine(),
+            "reglages": lire(),
+        }
+    )
+
+
+@protege("pilotage")
+@require_http_methods(["GET"])
+def signalements(request):
+    _admin, refus = _exiger_admin(request)
+    if refus:
+        return refus
+    type_filtre = texte_propre(request.GET.get("type"))
+    if type_filtre not in Signalement.Type.values:
+        type_filtre = ""
+    q = texte_propre(request.GET.get("q"))[:80]
+    qs = Signalement.objects.annotate(
+        appui_count=Count("appuis", distinct=True),
+        degage_count=Count("degages", distinct=True),
+    ).order_by("-cree_le")
+    if type_filtre:
+        qs = qs.filter(type=type_filtre)
+    if q:
+        qs = qs.filter(Q(lieu__icontains=q) | Q(commentaire__icontains=q))
+    lignes = []
+    for item in qs[:150]:
+        extrait = item.commentaire
+        if len(extrait) > 140:
+            extrait = extrait[:140].rstrip() + "…"
+        lignes.append(
+            {
+                "id": item.id,
+                "type": item.type,
+                "type_label": item.get_type_display(),
+                "lieu": item.lieu,
+                "extrait": extrait,
+                "appuis": item.appui_count,
+                "degages": item.degage_count,
+                "cree_le": item.cree_le.isoformat(),
+                "quand": _quand(item.cree_le),
+                "relatif": relatif(item.cree_le),
+            }
+        )
+    return reponse(
+        {
+            "signalements": lignes,
+            "total": len(lignes),
+            "types": [{"id": value, "label": label} for value, label in Signalement.Type.choices],
+            "filtre": {"type": type_filtre, "q": q},
+        }
+    )
+
+
+@protege("pilotage")
+@require_http_methods(["POST"])
+def retirer(request, pk):
+    admin, refus = _exiger_admin(request)
+    if refus:
+        return refus
+    if not Signalement.objects.filter(pk=pk).exists():
+        return erreur("Signalement introuvable.", status=404)
+    Signalement.objects.filter(pk=pk).delete()
+    journal(
+        "pilotage",
+        "signalement.removed",
+        request_id=request_id(request),
+        signalement_id=pk,
+        compte_id=admin.id,
+    )
+    return reponse({"retire": True, "id": pk})
+
+
+@protege("pilotage")
+@require_http_methods(["GET"])
+def comptes(request):
+    _admin, refus = _exiger_admin(request)
+    if refus:
+        return refus
+    lignes = [_fiche(compte) for compte in Compte.objects.order_by("-cree_le")[:200]]
+    return reponse(
+        {
+            "comptes": lignes,
+            "admins": Compte.objects.filter(est_admin=True).count(),
+        }
+    )
+
+
+@protege("pilotage")
+@require_http_methods(["POST"])
+def compte_modifier(request, pk):
+    admin, refus = _exiger_admin(request)
+    if refus:
+        return refus
+    cible = Compte.objects.filter(pk=pk).first()
+    if cible is None:
+        return erreur("Compte introuvable.", status=404)
+    data, message = lire_json(request)
+    if message:
+        return erreur(message)
+    champs = []
+    if "premium" in data:
+        cible.premium = _drapeau(data.get("premium"))
+        champs.append("premium")
+    if "est_admin" in data:
+        veut = _drapeau(data.get("est_admin"))
+        if cible.est_admin and not veut:
+            if not Compte.objects.filter(est_admin=True).exclude(pk=cible.pk).exists():
+                return erreur("Il doit rester au moins un administrateur.", status=400)
+        cible.est_admin = veut
+        champs.append("est_admin")
+    if champs:
+        cible.save(update_fields=champs)
+    journal(
+        "pilotage",
+        "compte.updated",
+        request_id=request_id(request),
+        compte_id=cible.id,
+        par=admin.id,
+        premium=bool(cible.premium),
+        est_admin=bool(cible.est_admin),
+    )
+    return reponse({"compte": _fiche(cible)})
+
+
+@protege("pilotage")
+@require_http_methods(["GET", "POST"])
+def reglages(request):
+    admin, refus = _exiger_admin(request)
+    if refus:
+        return refus
+    if request.method == "GET":
+        return reponse(lire())
+    data, message = lire_json(request)
+    if message:
+        return erreur(message)
+    duree = _entier(data.get("duree_heures"), DUREE_MIN, DUREE_MAX)
+    seuil = _entier(data.get("seuil_degage"), SEUIL_MIN, SEUIL_MAX)
+    plafond = _entier(data.get("plafond_heure"), PLAFOND_MIN, PLAFOND_MAX)
+    champs = {}
+    if duree is None:
+        champs["duree_heures"] = f"Entre {DUREE_MIN} et {DUREE_MAX} heures."
+    if seuil is None:
+        champs["seuil_degage"] = f"Entre {SEUIL_MIN} et {SEUIL_MAX} votes."
+    if plafond is None:
+        champs["plafond_heure"] = f"Entre {PLAFOND_MIN} et {PLAFOND_MAX} signalements."
+    if champs:
+        return erreur("Ces réglages ne sont pas valables.", champs=champs)
+    reglage = courant()
+    reglage.duree_heures = duree
+    reglage.seuil_degage = seuil
+    reglage.plafond_heure = plafond
+    reglage.save(update_fields=["duree_heures", "seuil_degage", "plafond_heure"])
+    journal(
+        "pilotage",
+        "reglages.updated",
+        request_id=request_id(request),
+        compte_id=admin.id,
+        duree_heures=duree,
+        seuil_degage=seuil,
+        plafond_heure=plafond,
+    )
+    return reponse(lire())

@@ -10,4 +10,5 @@ urlpatterns = [
     path("api/lieux/", include("apps.lieux.urls")),
     path("api/carte/", include("apps.signalements.carte_urls")),
     path("api/comptes/", include("apps.comptes.urls")),
+    path("api/admin/", include("apps.pilotage.urls")),
 ]

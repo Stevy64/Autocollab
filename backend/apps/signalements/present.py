@@ -24,10 +24,16 @@ def relatif(moment, maintenant=None):
     return f"il y a {jours} jours"
 
 
-def tendance(signalements, maintenant=None):
+def tendance(signalements, maintenant=None, heures=3):
     """Résumé lisible des dernières heures, sans suivi GPS."""
     maintenant = maintenant or timezone.now()
-    seuil = maintenant - timedelta(hours=3)
+    try:
+        fenetre = int(heures)
+    except (TypeError, ValueError):
+        fenetre = 3
+    if fenetre < 1:
+        fenetre = 3
+    seuil = maintenant - timedelta(hours=fenetre)
     recents = [item for item in signalements if item.cree_le >= seuil]
     chauds = sorted(
         (item for item in recents if item.type in TYPES_CHAUDS),

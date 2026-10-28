@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% block title %}Réglages — Wayizé{% endblock %}
+{% block content %}
+<header class="wa-hero">
+  <div>
+    <p class="wa-kicker">Règles</p>
+    <h1>Réglages</h1>
+    <p class="wa-lead">Ces trois nombres changent le comportement de la carte, tout de suite. Pas de suivi GPS.</p>
+  </div>
+</header>
+
+{% if erreur %}
+<div class="wa-flash is-error" role="alert">{{ erreur }}</div>
+{% endif %}
+
+<form class="wa-card wa-settings" method="post" action="{% url 'admin-reglages' %}">
+  {% csrf_token %}
+  <label for="duree">Durée de vie d’une alerte</label>
+  <p class="wa-field-help">Passé ce délai, l’alerte quitte la carte et la base. De 1 à 12 heures.</p>
+  <div class="wa-field-row">
+    <input id="duree" name="duree_heures" type="number" inputmode="numeric" min="1" max="12" required value="{{ reglages.duree_heures }}">
+    <span>heures</span>
+  </div>
+
+  <label for="seuil">Votes « c’est dégagé »</label>
+  <p class="wa-field-help">Des usagers distincts. Le dernier vote retire l’alerte aussitôt. De 2 à 5.</p>
+  <div class="wa-field-row">
+    <input id="seuil" name="seuil_degage" type="number" inputmode="numeric" min="2" max="5" required value="{{ reglages.seuil_degage }}">
+    <span>votes</span>
+  </div>
+
+  <label for="plafond">Plafond par navigateur</label>
+  <p class="wa-field-help">Nombre de signalements qu’un même navigateur peut publier en une heure. De 1 à 24.</p>
+  <div class="wa-field-row">
+    <input id="plafond" name="plafond_heure" type="number" inputmode="numeric" min="1" max="24" required value="{{ reglages.plafond_heure }}">
+    <span>par heure</span>
+  </div>
+
+  <button class="wa-btn wa-btn-dark" type="submit">Enregistrer</button>
+</form>
+{% endblock %}

@@ -6,6 +6,7 @@ class Compte(models.Model):
     secret = models.CharField(max_length=160)
     jeton = models.CharField(max_length=64, unique=True)
     premium = models.BooleanField(default=False)
+    est_admin = models.BooleanField(default=False)
     cree_le = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -20,6 +20,9 @@ _CLES_INTERDITES = (
     "session",
     "authorization",
     "cle",
+    "jeton",
+    "email",
+    "mot_de_passe",
 )
 
 

@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "apps.commentaires.apps.CommentairesConfig",
     "apps.lieux.apps.LieuxConfig",
     "apps.comptes.apps.ComptesConfig",
+    "apps.pilotage.apps.PilotageConfig",
 ]
 
 MIDDLEWARE = [

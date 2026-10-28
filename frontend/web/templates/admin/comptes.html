@@ -1,0 +1,39 @@
+{% extends "admin/base.html" %}
+{% block title %}Comptes — Wayizé{% endblock %}
+{% block content %}
+<header class="wa-hero">
+  <div>
+    <p class="wa-kicker">Droits</p>
+    <h1>Comptes</h1>
+    <p class="wa-lead">Premium ouvre les listes de lieux. Le droit d’administration ouvre cette console. Il doit rester au moins un administrateur.</p>
+  </div>
+</header>
+
+{% if admins_n == 1 %}
+<p class="wa-note wa-note-card">Un seul administrateur pour le moment. Son droit ne peut pas être retiré.</p>
+{% endif %}
+
+{% if lignes %}
+<ul class="wa-list">
+  {% for ligne in lignes %}
+  <li class="wa-row wa-row-account">
+    <div class="wa-row-copy">
+      <p class="wa-row-kicker">Depuis le {{ ligne.quand }}{% if ligne.id == moi %} · <span class="wa-pill">Vous</span>{% endif %}</p>
+      <h2>{{ ligne.email }}</h2>
+    </div>
+    <form class="wa-rights" method="post" action="{% url 'admin-compte' ligne.id %}">
+      {% csrf_token %}
+      <label class="wa-check"><input type="checkbox" name="premium" value="1"{% if ligne.premium %} checked{% endif %}> Premium</label>
+      <label class="wa-check"><input type="checkbox" name="est_admin" value="1"{% if ligne.est_admin %} checked{% endif %}> Admin</label>
+      <button class="wa-btn wa-btn-dark" type="submit">Enregistrer</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<section class="wa-card wa-empty">
+  <h2>Aucun compte</h2>
+  <p>Les comptes se créent depuis la carte.</p>
+</section>
+{% endif %}
+{% endblock %}

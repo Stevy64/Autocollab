@@ -66,6 +66,8 @@ const state = {
   compteErreur: "",
   compteEnCours: false,
   compteEmail: "",
+  dureeHeures: 3,
+  seuilDegage: 2,
 };
 
 function esc(value) {
@@ -189,6 +191,21 @@ function appuisPhrase(n) {
   if (n === 0) return "Aucun usager n'a encore confirmé.";
   if (n === 1) return "1 usager confirme ce signalement.";
   return `${n} usagers confirment ce signalement.`;
+}
+
+function phraseDegage(report) {
+  const n = report.degages || 0;
+  const seuil = Number(state.seuilDegage) || 2;
+  if (report.degage) return "Vous dites que c'est dégagé. Recliquez pour annuler.";
+  if (n <= 0) return "Si la situation n'est plus là, dites que c'est dégagé.";
+  const reste = seuil - n;
+  if (n === 1 && reste === 1) return "1 usager dit que c'est dégagé. Un deuxième retire l'alerte.";
+  if (reste === 1) return `${n} usagers disent que c'est dégagé. Un de plus retire l'alerte.`;
+  if (reste > 1) {
+    const voix = n > 1 ? "disent" : "dit";
+    return `${n} usager${n > 1 ? "s" : ""} ${voix} que c'est dégagé. Encore ${reste} votes pour retirer l'alerte.`;
+  }
+  return `${n} usagers disent que c'est dégagé.`;
 }
 
 function precisionsCourt(n) {
@@ -389,15 +406,22 @@ function nearestLieu(latitude, longitude) {
   return best;
 }
 
-const DUREE_ALERTE_MS = 3 * 60 * 60 * 1000;
-const CHAUDS = ["bouchon", "accident", "route_barree"];
-const HEAT = ["accident", "route_barree", "bouchon", "police", "travaux", "autre"];
+function noterPilotage(data) {
+  const heures = Number(data && data.duree_heures);
+  if (heures >= 1 && heures <= 12) state.dureeHeures = heures;
+  const seuil = Number(data && data.seuil_degage);
+  if (seuil >= 2 && seuil <= 5) state.seuilDegage = seuil;
+}
 
 function encoreValide(report) {
   const cree = Date.parse(report.cree_le || "");
   if (!cree) return true;
-  return Date.now() - cree < DUREE_ALERTE_MS;
+  const heures = Number(state.dureeHeures) || 3;
+  return Date.now() - cree < heures * 60 * 60 * 1000;
 }
+const HEAT = ["accident", "route_barree", "bouchon", "police", "travaux", "autre"];
+
+const CHAUDS = ["bouchon", "accident", "route_barree"];
 
 function visibleReports() {
   return state.reports.filter((report) => {
@@ -798,13 +822,7 @@ function renderDetail() {
     ? `${appuisPhrase(report.appuis)} Recliquez pour retirer la vôtre.`
     : appuisPhrase(report.appuis);
   const degages = report.degages || 0;
-  const degageHint = report.degage
-    ? "Vous dites que c'est dégagé. Recliquez pour annuler."
-    : degages === 1
-      ? "1 usager dit que c'est dégagé. Un deuxième retire l'alerte."
-      : degages > 1
-        ? `${degages} usagers disent que c'est dégagé.`
-        : "Si la situation n'est plus là, dites que c'est dégagé.";
+  const degageHint = phraseDegage(report);
   return `
     <div class="sheet-head">
       <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("back")} Retour</button>
@@ -1034,6 +1052,7 @@ function renderCompte() {
           <button type="button" class="btn btn-ghost btn-block" data-action="silence">${uiIcon("moon")} Silence pendant 2 heures</button>
         </section>` : ""}
       <button type="button" class="btn btn-ghost btn-block" data-action="back">${uiIcon("back")} Retour à la carte</button>
+      ${state.compte.est_admin ? `<a class="btn btn-ghost btn-block" href="/admin/">${uiIcon("layers")} Administration</a>` : ""}
     </div>`;
 }
 
@@ -1270,7 +1289,11 @@ async function degager(id) {
         state.returnMode = "feed";
         history.replaceState(null, "", `${location.pathname}${location.search}`);
       }
-      toast("Deux usagers disent que c'est dégagé. L'alerte est retirée.");
+      toast(
+        (Number(state.seuilDegage) || 2) === 2
+          ? "Deux usagers disent que c'est dégagé. L'alerte est retirée."
+          : `${state.seuilDegage} usagers disent que c'est dégagé. L'alerte est retirée.`,
+      );
       render();
       return;
     }
@@ -1335,6 +1358,7 @@ async function reload() {
   }
   try {
     const data = await api("/api/signalements/");
+    noterPilotage(data);
     if (avaitUnCache) surveiller(precedents, data.signalements || []);
     state.reports = data.signalements;
     state.tendance = data.tendance;
@@ -1342,7 +1366,14 @@ async function reload() {
     state.loading = false;
     state.error = null;
     state.markerKey = "";
-    ecrireMemoire({ feed: { signalements: data.signalements, tendance: data.tendance } });
+    ecrireMemoire({
+      feed: {
+        signalements: data.signalements,
+        tendance: data.tendance,
+        duree_heures: state.dureeHeures,
+        seuil_degage: state.seuilDegage,
+      },
+    });
     render();
     applyHashOnce();
   } catch (error) {
@@ -1376,12 +1407,20 @@ async function quietRefresh() {
     const precedents = state.reports.slice();
     const regardait = state.mode === "detail" ? state.selectedId : null;
     const data = await api("/api/signalements/");
+    noterPilotage(data);
     if (precedents.length) surveiller(precedents, data.signalements || []);
     state.reports = data.signalements;
     state.tendance = data.tendance;
     state.loaded = true;
     state.markerKey = "";
-    ecrireMemoire({ feed: { signalements: data.signalements, tendance: data.tendance } });
+    ecrireMemoire({
+      feed: {
+        signalements: data.signalements,
+        tendance: data.tendance,
+        duree_heures: state.dureeHeures,
+        seuil_degage: state.seuilDegage,
+      },
+    });
     if (state.mode === "detail" && !selected()) {
       state.mode = "feed";
       state.selectedId = null;
@@ -1701,6 +1740,7 @@ function restaurerMemoire() {
   state.trajet = memoire.trajet || null;
   if (memoire.compte && memoire.compte.email) state.compte = memoire.compte;
   if (memoire.feed && Array.isArray(memoire.feed.signalements)) {
+    noterPilotage(memoire.feed);
     state.reports = memoire.feed.signalements;
     state.tendance = memoire.feed.tendance || null;
     state.loaded = true;

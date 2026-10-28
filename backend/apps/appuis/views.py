@@ -4,12 +4,11 @@ from django.views.decorators.http import require_POST
 from apps.http import erreur, protege, reponse
 from apps.identite import cle_session
 from apps.journal import journal, request_id
+from apps.pilotage.reglages import lire
 from apps.signalements.models import Signalement
 from apps.signalements.views import purger_expires, reponse_signalement
 
 from .models import Appui, Degage
-
-SEUIL_DEGAGE = 2
 
 
 @protege("appuis")
@@ -130,7 +129,7 @@ def degage(request, pk):
         signalement_id=pk,
         nouveau=True,
     )
-    if Degage.objects.filter(signalement_id=pk).count() >= SEUIL_DEGAGE:
+    if Degage.objects.filter(signalement_id=pk).count() >= lire()["seuil_degage"]:
         Signalement.objects.filter(pk=pk).delete()
         journal(
             "appuis",
