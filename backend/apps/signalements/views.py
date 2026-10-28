@@ -1,0 +1,204 @@
+from datetime import timedelta
+
+from django.db import IntegrityError
+from django.db.models import Count, Prefetch
+from django.utils import timezone
+from django.views.decorators.http import require_GET
+
+from apps.commentaires.models import Commentaire
+from apps.http import erreur, lire_json, nombre, protege, reponse, texte_propre
+from apps.identite import cle_session
+from apps.journal import journal, request_id
+
+from .geo import CENTRE, EST, LIEUX, NORD, OUEST, SUD, dans_libreville
+from .models import Signalement
+from .present import signalement_public, tendance
+
+MAX_PAR_HEURE = 8
+
+
+def base_signalements():
+    return (
+        Signalement.objects.annotate(appui_count=Count("appuis"))
+        .prefetch_related(
+            Prefetch(
+                "commentaires",
+                queryset=Commentaire.objects.order_by("-cree_le"),
+                to_attr="notes_recentes",
+            )
+        )
+        .order_by("-cree_le")
+    )
+
+
+def ids_appuyes(cle, identifiants):
+    if not cle or not identifiants:
+        return set()
+    from apps.appuis.models import Appui
+
+    return set(
+        Appui.objects.filter(session_cle=cle, signalement_id__in=identifiants).values_list(
+            "signalement_id",
+            flat=True,
+        )
+    )
+
+
+def charger(pk):
+    return base_signalements().get(pk=pk)
+
+
+def reponse_signalement(request, pk, status=200):
+    try:
+        item = charger(pk)
+    except Signalement.DoesNotExist:
+        return erreur("Signalement introuvable.", status=404)
+    appuye = item.id in ids_appuyes(cle_session(request), [item.id])
+    return reponse({"signalement": signalement_public(item, appuye)}, status=status)
+
+
+@require_GET
+def carte(request):
+    journal(
+        "signalements",
+        "carte.read",
+        request_id=request_id(request),
+        lieux=len(LIEUX),
+    )
+    return reponse(
+        {
+            "lieux": LIEUX,
+            "types": [
+                {"id": value, "label": label} for value, label in Signalement.Type.choices
+            ],
+            "centre": CENTRE,
+            "bornes": {"sud": SUD, "ouest": OUEST, "nord": NORD, "est": EST},
+        }
+    )
+
+
+@protege("signalements")
+def signalements(request):
+    if request.method == "POST":
+        return creer(request)
+    if request.method != "GET":
+        return erreur("Méthode non prise en charge.", status=405)
+    return lister(request)
+
+
+def lister(request):
+    items = list(base_signalements()[:100])
+    appuyes = ids_appuyes(cle_session(request), [item.id for item in items])
+    return reponse(
+        {
+            "signalements": [
+                signalement_public(item, item.id in appuyes) for item in items
+            ],
+            "tendance": tendance(items),
+        }
+    )
+
+
+def creer(request):
+    data, message = lire_json(request)
+    if data is None:
+        journal(
+            "signalements",
+            "signalement.rejected",
+            level="warning",
+            request_id=request_id(request),
+            status=400,
+        )
+        return erreur(message)
+    champs = {}
+    type_incident = data.get("type")
+    if type_incident not in Signalement.Type.values:
+        champs["type"] = (
+            "Choisissez un type : bouchon, accident, travaux, police, route barrée ou autre."
+        )
+    commentaire = texte_propre(data.get("commentaire"))
+    if len(commentaire) < 8:
+        champs["commentaire"] = "Décrivez la situation en au moins 8 caractères."
+    elif len(commentaire) > 280:
+        champs["commentaire"] = "280 caractères maximum."
+    lieu = texte_propre(data.get("lieu"))
+    latitude = nombre(data.get("latitude"))
+    longitude = nombre(data.get("longitude"))
+    if not lieu or latitude is None or longitude is None:
+        champs["lieu"] = "Indiquez un quartier connu ou un point sur la carte."
+    elif not dans_libreville(latitude, longitude):
+        champs["lieu"] = "Ce point est en dehors du Grand Libreville."
+    elif len(lieu) > 120:
+        champs["lieu"] = "Le nom du lieu est trop long."
+    if champs:
+        journal(
+            "signalements",
+            "signalement.rejected",
+            level="warning",
+            request_id=request_id(request),
+            status=400,
+            champs=sorted(champs),
+        )
+        return erreur("Le signalement est incomplet.", champs=champs)
+
+    cle = cle_session(request)
+    if not cle:
+        journal(
+            "signalements",
+            "signalement.rejected",
+            level="warning",
+            request_id=request_id(request),
+            status=400,
+            raison="identite",
+        )
+        return erreur("Ouvrez Wayizé dans le navigateur pour publier un signalement.")
+
+    depuis = timezone.now() - timedelta(hours=1)
+    if (
+        Signalement.objects.filter(session_cle=cle, cree_le__gte=depuis).count()
+        >= MAX_PAR_HEURE
+    ):
+        journal(
+            "signalements",
+            "signalement.rate_limited",
+            level="warning",
+            request_id=request_id(request),
+            status=429,
+        )
+        return erreur(
+            "Vous avez déjà publié plusieurs signalements dans l'heure. "
+            "Merci de laisser de la place aux autres conducteurs.",
+            status=429,
+        )
+    try:
+        signalement = Signalement.objects.create(
+            type=type_incident,
+            commentaire=commentaire,
+            lieu=lieu,
+            latitude=latitude,
+            longitude=longitude,
+            session_cle=cle,
+        )
+    except IntegrityError:
+        journal(
+            "signalements",
+            "signalement.rejected",
+            level="warning",
+            request_id=request_id(request),
+            status=400,
+            champs=["lieu"],
+        )
+        return erreur(
+            "Ce signalement ne peut pas être enregistré.",
+            champs={"lieu": "Ce point est en dehors du Grand Libreville."},
+        )
+    journal(
+        "signalements",
+        "signalement.created",
+        request_id=request_id(request),
+        signalement_id=signalement.pk,
+        type=signalement.type,
+        lieu=signalement.lieu,
+        commentaire_len=len(commentaire),
+    )
+    return reponse_signalement(request, signalement.pk, status=201)
