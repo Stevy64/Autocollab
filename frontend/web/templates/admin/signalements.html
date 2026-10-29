@@ -5,7 +5,9 @@
   <div>
     <p class="wa-kicker">Carte</p>
     <h1>Signalements</h1>
-    <p class="wa-lead">{% if lignes %}{{ total }} en cours. Retirer un signalement le supprime pour tout le monde.{% else %}Aucun signalement ne correspond.{% endif %}</p>
+    {% if lignes %}
+    <p class="wa-lead">{{ total }} en cours. Retirer un signalement le supprime pour tout le monde.</p>
+    {% endif %}
   </div>
 </header>
 
@@ -32,27 +34,29 @@
   {% if lignes %}
   <ul class="wa-list">
     {% for ligne in lignes %}
-    <li class="wa-row">
-      <div class="wa-row-copy">
-        <p class="wa-row-kicker"><span class="wa-pill">{{ ligne.type_label }}</span><span class="wa-when">{{ ligne.quand }} · {{ ligne.relatif }}</span></p>
-        <h2>{{ ligne.lieu }}</h2>
-        <p>{{ ligne.extrait }}</p>
-        <p class="wa-row-meta"><span class="wa-count">Confirmé ×{{ ligne.appuis }}</span>{% if ligne.degages %}<span class="wa-count is-clear">Dégagé ×{{ ligne.degages }}</span>{% endif %}</p>
+    <li class="wa-row wa-report">
+      <div class="wa-report-head">
+        <p class="wa-row-kicker"><span class="wa-pill">{{ ligne.type_label }}</span><span class="wa-when" title="{{ ligne.quand }}">{{ ligne.relatif }}</span><span class="wa-when-abs">{{ ligne.quand }}</span></p>
+        <form method="post" action="{% url 'admin-retirer' ligne.id %}" data-confirm="Retirer ce signalement de la carte ?">
+          {% csrf_token %}
+          <input type="hidden" name="type" value="{{ filtre.type }}">
+          <input type="hidden" name="q" value="{{ filtre.q }}">
+          <button class="wa-btn wa-btn-danger" type="submit">{% include "admin/icone.html" with name="trash" %} Retirer</button>
+        </form>
       </div>
-      <form method="post" action="{% url 'admin-retirer' ligne.id %}" data-confirm="Retirer ce signalement de la carte ?">
-        {% csrf_token %}
-        <input type="hidden" name="type" value="{{ filtre.type }}">
-        <input type="hidden" name="q" value="{{ filtre.q }}">
-        <button class="wa-btn wa-btn-danger" type="submit">{% include "admin/icone.html" with name="trash" %} Retirer</button>
-      </form>
+      <h2>{{ ligne.lieu }}</h2>
+      {% if ligne.extrait %}<p class="wa-excerpt">{{ ligne.extrait }}</p>{% endif %}
+      <p class="wa-row-meta"><span class="wa-count">Confirmé ×{{ ligne.appuis }}</span>{% if ligne.degages %}<span class="wa-count is-clear">Dégagé ×{{ ligne.degages }}</span>{% endif %}</p>
     </li>
     {% endfor %}
   </ul>
   {% else %}
-  <div class="wa-empty">
+  <div class="wa-empty wa-empty-inline">
     <span class="wa-empty-ico" aria-hidden="true">{% include "admin/icone.html" with name="pin" %}</span>
-    <h2>Rien à modérer</h2>
-    <p>Les alertes expirées quittent déjà la base. Un signalement encore visible sur la carte apparaît ici.</p>
+    <div>
+      <h2>Aucun signalement ne correspond.</h2>
+      <p>Les alertes expirées quittent déjà la base. Un signalement encore visible sur la carte apparaît ici.</p>
+    </div>
   </div>
   {% endif %}
 </section>
