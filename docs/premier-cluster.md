@@ -427,7 +427,7 @@ Si une commande répond `already exists` : `kubectl -n wayize delete secret wayi
 
 ### 10.5 API
 
-Le frontal, à la section suivante, est identique pour les deux stockages. Seule l’API change.
+Le frontal, à la section suivante, est identique pour les deux stockages. Seule l’API change. La sonde doit envoyer `Host: localhost`, sinon le rollout reste bloqué.
 
 **SQLite.** Un disque de 1 Gio, un seul pod, la migration dans ce pod. L’utilisateur du conteneur est `10001`, le même que l’image. `fsGroup` lui donne le droit d’écrire sur le disque. `Recreate` arrête l’ancien pod avant le nouveau : ce disque ne se monte que sur un pod à la fois.
 
@@ -483,10 +483,16 @@ spec:
             httpGet:
               path: /api/sante/
               port: 8648
+              httpHeaders:
+                - name: Host
+                  value: localhost
           livenessProbe:
             httpGet:
               path: /api/sante/
               port: 8648
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 20
           volumeMounts:
             - name: data
@@ -590,10 +596,16 @@ spec:
             httpGet:
               path: /api/sante/
               port: 8648
+              httpHeaders:
+                - name: Host
+                  value: localhost
           livenessProbe:
             httpGet:
               path: /api/sante/
               port: 8648
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 20
 ---
 apiVersion: v1
