@@ -1,0 +1,15 @@
+[Unit]
+Description=Wayizé carte
+After=network.target wayize-api.service
+
+[Service]
+User=wayize
+Group=wayize
+WorkingDirectory=/srv/wayize/frontend
+EnvironmentFile=/etc/wayize/web.env
+ExecStart=/srv/wayize/.venv/bin/gunicorn wayize_web.wsgi:application --bind 127.0.0.1:8647 --workers 2 --access-logfile - --error-logfile -
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

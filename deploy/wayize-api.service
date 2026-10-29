@@ -1,0 +1,16 @@
+[Unit]
+Description=Wayizé API
+After=network.target
+
+[Service]
+User=wayize
+Group=wayize
+WorkingDirectory=/srv/wayize/backend
+EnvironmentFile=/etc/wayize/api.env
+# Un worker : SQLite ne se partage pas. Avec DATABASE_URL (PostgreSQL), --workers 2 est possible.
+ExecStart=/srv/wayize/.venv/bin/gunicorn wayize_api.wsgi:application --bind 127.0.0.1:8648 --workers 1 --access-logfile - --error-logfile -
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

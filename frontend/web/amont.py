@@ -1,4 +1,9 @@
-"""Appels HTTP du frontal vers l'API, sur le modèle du proxy /api de Gabomazone."""
+"""Appels HTTP du frontal vers l'API, sur le modèle du proxy /api de Gabomazone.
+
+Limite de service : le navigateur n'appelle jamais l'API. ``WAYIZE_API_URL``
+reste sur le loopback (ou le réseau interne du cluster). nginx ne doit pas
+court-circuiter ce module, sinon ``X-Wayize-Session`` n'est pas posé.
+"""
 
 import json
 import re

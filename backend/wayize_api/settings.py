@@ -1,17 +1,19 @@
-"""Réglages de l'API Wayizé. Comptes et listes sont dans l'application comptes."""
+"""Réglages de développement de l'API.
+
+``python manage.py runserver 127.0.0.1:8648`` charge ce module.
+La production est ``wayize_api.prod``.
+"""
 
 import os
 from pathlib import Path
 
+from .reglages import base_de_donnees, hotes, secret
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "dev-only-wayize-api-not-for-production",
-)
-
+SECRET_KEY = secret(prod=False)
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = hotes(prod=False)
 WAYIZE_SERVICE = "api"
 
 INSTALLED_APPS = [
@@ -42,12 +44,8 @@ TEMPLATES = [
     },
 ]
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+# Magasin des signalements. SQLite si DATABASE_URL est vide.
+DATABASES = base_de_donnees(BASE_DIR)
 
 LANGUAGE_CODE = "fr-fr"
 TIME_ZONE = "Africa/Libreville"

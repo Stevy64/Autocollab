@@ -94,6 +94,7 @@ def sante(request):
 
 
 def proxy(request, reste):
+    """Porte unique vers l'API. Ajoute la session anonyme, puis appelle WAYIZE_API_URL."""
     chemin = "/api/" + reste.lstrip("/")
     if request.path.endswith("/") and not chemin.endswith("/"):
         chemin += "/"

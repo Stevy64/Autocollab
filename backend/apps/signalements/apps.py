@@ -1,3 +1,5 @@
+import os
+
 from django.apps import AppConfig
 
 
@@ -11,6 +13,9 @@ class SignalementsConfig(AppConfig):
         from django.db.models.signals import post_migrate
 
         def _seed(sender, **kwargs):
+            # WAYIZE_SEED=0 : première migration de prod sans les signalements d'exemple.
+            if os.environ.get("WAYIZE_SEED", "1").strip() == "0":
+                return
             from django.db import connection
             from django.db.utils import OperationalError, ProgrammingError
 

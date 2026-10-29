@@ -1,8 +1,13 @@
 import json
+import os
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, override_settings
 
 
@@ -234,3 +239,29 @@ class WebSliceTests(SimpleTestCase):
         self.client.post("/admin/sortie/")
         ferme = self.client.get("/admin/")
         self.assertEqual(ferme.status_code, 302)
+
+
+class ProdSettingsTests(SimpleTestCase):
+    def test_dev_module_stays_the_default(self):
+        self.assertEqual(settings.SETTINGS_MODULE, "wayize_web.settings")
+        self.assertIsNone(settings.SECURE_PROXY_SSL_HEADER)
+
+    def test_prod_module_refuses_a_missing_secret(self):
+        with patch.dict(os.environ, {"DJANGO_SECRET_KEY": ""}, clear=False):
+            sys.modules.pop("wayize_web.prod", None)
+            try:
+                with self.assertRaises(ImproperlyConfigured):
+                    __import__("wayize_web.prod")
+            finally:
+                sys.modules.pop("wayize_web.prod", None)
+
+    def test_public_host_and_origin_defaults(self):
+        from wayize_web.reglages import hotes, origines, securite_proxy
+
+        with patch.dict(os.environ, {"WAYIZE_HOSTS": "", "WAYIZE_CSRF_ORIGINS": ""}, clear=False):
+            self.assertEqual(hotes(False), ["*"])
+            self.assertEqual(hotes(True), ["wayize.gabomazone.com"])
+            self.assertEqual(origines(False), [])
+            self.assertEqual(origines(True), ["https://wayize.gabomazone.com"])
+        self.assertEqual(securite_proxy()["SECURE_PROXY_SSL_HEADER"], ("HTTP_X_FORWARDED_PROTO", "https"))
+        self.assertFalse(securite_proxy()["SECURE_SSL_REDIRECT"])

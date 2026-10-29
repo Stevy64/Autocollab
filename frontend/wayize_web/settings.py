@@ -1,18 +1,23 @@
-"""Réglages du frontal Wayizé. La carte est servie ici ; les données viennent de l'API."""
+"""Réglages de développement du frontal.
+
+``python manage.py runserver 127.0.0.1:8647`` charge ce module.
+La production est ``wayize_web.prod`` (variable ``DJANGO_SETTINGS_MODULE``).
+"""
 
 import os
 from pathlib import Path
 
+from .reglages import hotes, origines, secret
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "dev-only-wayize-web-not-for-production",
-)
-
+SECRET_KEY = secret(prod=False)
 DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = hotes(prod=False)
+CSRF_TRUSTED_ORIGINS = origines(prod=False)
 WAYIZE_SERVICE = "web"
+# Le frontal est le seul à parler à l'API. En local comme en prod, cette URL
+# reste privée (loopback, ou le nom du service dans le cluster).
 API_UPSTREAM = os.environ.get("WAYIZE_API_URL", "http://127.0.0.1:8648").rstrip("/")
 
 INSTALLED_APPS = [
@@ -46,6 +51,7 @@ TEMPLATES = [
     },
 ]
 
+# Cookie signé : cette base ne contient pas les signalements.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -61,6 +67,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = Path(os.environ["WAYIZE_STATIC_ROOT"]) if os.environ.get("WAYIZE_STATIC_ROOT") else BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGGING = {

@@ -10,17 +10,18 @@ Le dépôt suit le même dessin que [Gabomazone_SPA](https://github.com/Stevy64/
 
 ```
 frontend/                 carte PWA (Django), port 8647
-  wayize_web/             réglages du frontal
+  wayize_web/             réglages du frontal (settings = dev, prod = production)
   web/                    pages, manifeste, proxy /api
 backend/                  API, port 8648 (loopback)
-  wayize_api/             réglages, comme gabomazone_api
+  wayize_api/             réglages de l'API (settings = dev, prod = production)
   apps/signalements/      signalements, graine, cadre de carte
   apps/comptes/           comptes, listes de lieux, droit Premium
   apps/pilotage/          réglages de la carte et console d'administration
   apps/appuis/            un appui par navigateur
   apps/commentaires/      précisions
   apps/lieux/             quartiers connus
-nginx.conf                le même découpage / et /api, si un jour un proxy externe est utile
+nginx.conf                site nginx de wayize.gabomazone.com (TLS, frontal seul)
+deploy/                   unités systemd et exemples de variables, sans secret
 ```
 
 Les applications de l’API lisent les signalements dans le même processus et la même base SQLite. Un compte facultatif garde des listes de lieux. Premium (trajet, alertes, GPS, mode conduite) s’active sur ce serveur sans débit : le paiement mobile money n’est pas branché. Le téléphone garde le dernier flux dans son stockage local.
@@ -41,10 +42,60 @@ python manage.py runserver 127.0.0.1:8648
 
 # Carte, dans un autre terminal
 cd frontend
-WAYIZE_API_URL=http://127.0.0.1:8648 python manage.py runserver 0.0.0.0:8647
+WAYIZE_API_URL=http://127.0.0.1:8648 python manage.py runserver 127.0.0.1:8647
 ```
 
-Ouvrir [http://127.0.0.1:8647](http://127.0.0.1:8647).
+Sous Windows PowerShell, dans `frontend` :
+
+```powershell
+$env:WAYIZE_API_URL = "http://127.0.0.1:8648"
+python manage.py runserver 127.0.0.1:8647
+```
+
+Ouvrir [http://127.0.0.1:8647](http://127.0.0.1:8647). Ces commandes chargent `wayize_web.settings` et `wayize_api.settings`. Rien à exporter d'autre : `DEBUG` est actif, les hôtes sont ouverts, la base est `backend/db.sqlite3`.
+
+## Local et production
+
+Le développement et la production sont deux modules. Les serveurs locaux ci-dessus ne changent pas. La production se lance avec gunicorn et `DJANGO_SETTINGS_MODULE`.
+
+| | Local | Production |
+| --- | --- | --- |
+| Frontal | `wayize_web.settings`, `runserver 127.0.0.1:8647` | `wayize_web.prod`, gunicorn sur `127.0.0.1:8647` |
+| API | `wayize_api.settings`, `runserver 127.0.0.1:8648` | `wayize_api.prod`, gunicorn sur `127.0.0.1:8648` |
+| Hôtes | `*` | `WAYIZE_HOSTS` (défaut `wayize.gabomazone.com`) |
+| CSRF | origines vides | `https://wayize.gabomazone.com` |
+| TLS | non | nginx, en-tête `X-Forwarded-Proto` |
+| Base | SQLite | SQLite pour un seul processus API ; PostgreSQL dès qu'il y en a plusieurs |
+
+Variables. Aucune n'est dans le dépôt. Les modèles vides sont `deploy/web.env.example` et `deploy/api.env.example`.
+
+| Variable | Processus | Rôle |
+| --- | --- | --- |
+| `DJANGO_SETTINGS_MODULE` | les deux | `wayize_web.prod` ou `wayize_api.prod` |
+| `DJANGO_SECRET_KEY` | les deux, une valeur chacune | obligatoire en prod, 32 caractères ou plus, autre que la clé `dev-only-…` |
+| `WAYIZE_HOSTS` | frontal | hôtes publics, séparés par des virgules |
+| `WAYIZE_CSRF_ORIGINS` | frontal | origines HTTPS des formulaires `/admin/` |
+| `WAYIZE_API_URL` | frontal | où joindre l'API. Défaut `http://127.0.0.1:8648`. Dans un cluster, le nom du service interne |
+| `WAYIZE_API_HOSTS` | API | hôtes acceptés pour cet appel. Défaut prod `127.0.0.1,localhost`. Ne pas y mettre le nom public |
+| `WAYIZE_STATIC_ROOT` | frontal | dossier de `collectstatic`. Défaut `frontend/staticfiles` |
+| `DATABASE_URL` | API | vide = SQLite. Sinon `postgresql://UTILISATEUR:MOT@HOTE:5432/wayize?sslmode=require` |
+| `WAYIZE_SQLITE_PATH` | API | autre chemin que `backend/db.sqlite3` |
+| `WAYIZE_SEED` | API | `0` pour ne pas insérer les signalements d'exemple à la première migration |
+| `DJANGO_DEBUG` | dev seulement | `0` coupe le mode debug. Ignoré par les modules `prod` |
+
+Générer une clé : `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Le mot de passe d'une `DATABASE_URL` se met entre les `:` et le `@`, encodé (un `@` dans le mot devient `%40`).
+
+Migration, depuis `backend`, avec les variables de l'API déjà posées :
+
+```bash
+python manage.py migrate
+```
+
+La première fois, si `WAYIZE_SEED` n'est pas `0`, une dizaine de signalements d'exemple sont créés. `seed_signalements --force` les régénère. `collectstatic` se lance depuis `frontend` et remplit `STATIC_ROOT`, que nginx sert sous `/static/`.
+
+Les journaux restent des lignes JSON sur la sortie d'erreur (logger `wayize`). gunicorn et nginx les laissent passer : `journalctl -u wayize-web -u wayize-api` sur une instance, ou la sortie du conteneur dans un cluster. L'en-tête `X-Request-Id` relie les deux processus. Rien de secret n'y entre.
+
+Le guide pas à pas pour OVHcloud est [docs/ovh-clusters.md](docs/ovh-clusters.md). Le site nginx est [nginx.conf](nginx.conf) : TLS devant, seul le frontal est publié.
 
 `migrate` crée `backend/db.sqlite3` et y place une dizaine de signalements d’exemple (Mont-Bouët, PK5, l’aéroport Léon-Mba, Owendo, Nzeng-Ayong…). Pour les régénérer :
 
@@ -99,7 +150,7 @@ Le fuseau horaire est `Africa/Libreville`. L’interface est en français.
 
 ## Hors périmètre
 
-Le paiement mobile money n’est pas branché : activer Premium enregistre le droit, sans débit. La clé secrète par défaut ne sert qu’en local ; en dehors de cette machine, définir `DJANGO_SECRET_KEY` (une valeur par processus, ou la même, elle n’est pas journalisée).
+Le paiement mobile money n’est pas branché : activer Premium enregistre le droit, sans débit. La clé `dev-only-…` ne sert qu’aux modules de développement. En production le module `prod` refuse de démarrer sans `DJANGO_SECRET_KEY`.
 
 ## Crédits
 
