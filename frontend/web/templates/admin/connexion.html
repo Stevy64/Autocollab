@@ -30,14 +30,20 @@
       {% endif %}
       <form method="post" action="{% url 'admin-connexion' %}" class="wa-form">
         {% csrf_token %}
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="username" inputmode="email" required maxlength="254" value="{{ email }}">
-        <label for="mot">Mot de passe</label>
-        <input id="mot" name="mot_de_passe" type="password" autocomplete="current-password" required minlength="8" maxlength="72">
-        <button class="wa-btn wa-btn-dark wa-btn-block" type="submit">Entrer</button>
+        <label for="email">{% include "admin/icone.html" with name="user" %} Identifiant</label>
+        <div class="wa-field">
+          <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="user" %}</span>
+          <input id="email" name="email" type="text" autocomplete="username" required maxlength="254" value="{{ email }}" placeholder="Email ou identifiant">
+        </div>
+        <label for="mot">{% include "admin/icone.html" with name="lock" %} Mot de passe</label>
+        <div class="wa-field">
+          <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="lock" %}</span>
+          <input id="mot" name="mot_de_passe" type="password" autocomplete="current-password" required minlength="4" maxlength="72" placeholder="Mot de passe">
+        </div>
+        <button class="wa-btn wa-btn-dark wa-btn-block" type="submit">{% include "admin/icone.html" with name="enter" %} Entrer</button>
       </form>
-      <p class="wa-note">S’il n’y a encore aucun administrateur, le premier compte Wayizé qui se connecte ici le devient. Ensuite, seuls les administrateurs entrent. Le compte se crée sur la carte.</p>
-      <a class="wa-text-link" href="/">Retour à la carte</a>
+      <p class="wa-note">S’il n’y a encore aucun administrateur, le premier compte Wayizé qui se connecte ici le devient. Ensuite, seuls les administrateurs entrent. Le compte se crée sur la carte, ou avec un identifiant court.</p>
+      <a class="wa-text-link" href="/">{% include "admin/icone.html" with name="map" %} Retour à la carte</a>
     </section>
   </main>
 </body>

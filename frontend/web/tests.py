@@ -205,6 +205,8 @@ class WebSliceTests(SimpleTestCase):
         porte = self.client.get("/admin/connexion/")
         self.assertEqual(porte.status_code, 200)
         self.assertContains(porte, "premier compte")
+        self.assertContains(porte, "Identifiant")
+        self.assertContains(porte, "wa-field")
         self.assertContains(porte, "Entrer")
         self.assertNotContains(porte, jeton)
         accueil = self.client.get("/admin/")

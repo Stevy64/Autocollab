@@ -23,15 +23,16 @@
     </div>
     <form class="wa-rights" method="post" action="{% url 'admin-compte' ligne.id %}">
       {% csrf_token %}
-      <label class="wa-check"><input type="checkbox" name="premium" value="1"{% if ligne.premium %} checked{% endif %}> Premium</label>
-      <label class="wa-check"><input type="checkbox" name="est_admin" value="1"{% if ligne.est_admin %} checked{% endif %}> Admin</label>
-      <button class="wa-btn wa-btn-dark" type="submit">Enregistrer</button>
+      <label class="wa-check"><input type="checkbox" name="premium" value="1"{% if ligne.premium %} checked{% endif %}> {% include "admin/icone.html" with name="star" %} Premium</label>
+      <label class="wa-check"><input type="checkbox" name="est_admin" value="1"{% if ligne.est_admin %} checked{% endif %}> {% include "admin/icone.html" with name="shield" %} Admin</label>
+      <button class="wa-btn wa-btn-dark" type="submit">{% include "admin/icone.html" with name="check" %} Enregistrer</button>
     </form>
   </li>
   {% endfor %}
 </ul>
 {% else %}
 <section class="wa-card wa-empty">
+  <span class="wa-empty-ico" aria-hidden="true">{% include "admin/icone.html" with name="users" %}</span>
   <h2>Aucun compte</h2>
   <p>Les comptes se créent depuis la carte.</p>
 </section>

@@ -8,31 +8,31 @@
     <p class="wa-lead">Ce qui est sur la carte en ce moment, et les règles qui le font vivre.</p>
   </div>
   <div class="wa-hero-actions">
-    <a class="wa-btn wa-btn-dark" href="{% url 'admin-signalements' %}">Signalements</a>
-    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-comptes' %}">Comptes</a>
-    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-reglages' %}">Réglages</a>
+    <a class="wa-btn wa-btn-dark" href="{% url 'admin-signalements' %}">{% include "admin/icone.html" with name="pin" %} Signalements</a>
+    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-comptes' %}">{% include "admin/icone.html" with name="users" %} Comptes</a>
+    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-reglages' %}">{% include "admin/icone.html" with name="sliders" %} Réglages</a>
   </div>
 </header>
 
 {% if not vide %}
 <section class="wa-metrics" aria-label="Indicateurs">
   <article class="wa-metric">
-    <span class="wa-metric-label">Signalements</span>
+    <span class="wa-metric-label">{% include "admin/icone.html" with name="pin" %} Signalements</span>
     <strong>{{ signalements_n }}</strong>
     <span class="wa-metric-sub">{{ en_retrait }} en cours de retrait</span>
   </article>
   <article class="wa-metric">
-    <span class="wa-metric-label">Comptes</span>
+    <span class="wa-metric-label">{% include "admin/icone.html" with name="users" %} Comptes</span>
     <strong>{{ comptes_n }}</strong>
     <span class="wa-metric-sub">{{ premium_n }} premium · {{ admins_n }} admin{{ admins_n|pluralize }}</span>
   </article>
   <article class="wa-metric">
-    <span class="wa-metric-label">Confirmations</span>
+    <span class="wa-metric-label">{% include "admin/icone.html" with name="check" %} Confirmations</span>
     <strong>{{ appuis_n }}</strong>
     <span class="wa-metric-sub">{{ degages_n }} vote{{ degages_n|pluralize }} « dégagé »</span>
   </article>
   <article class="wa-metric is-ink">
-    <span class="wa-metric-label">Durée d’une alerte</span>
+    <span class="wa-metric-label">{% include "admin/icone.html" with name="clock" %} Durée d’une alerte</span>
     <strong>{{ reglages.duree_heures }} h</strong>
     <span class="wa-metric-sub">{{ reglages.seuil_degage }} votes pour retirer · {{ reglages.plafond_heure }} / h</span>
   </article>

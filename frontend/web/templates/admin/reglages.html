@@ -15,27 +15,36 @@
 
 <form class="wa-card wa-settings" method="post" action="{% url 'admin-reglages' %}">
   {% csrf_token %}
-  <label for="duree">Durée de vie d’une alerte</label>
+  <label for="duree">{% include "admin/icone.html" with name="clock" %} Durée de vie d’une alerte</label>
   <p class="wa-field-help">Passé ce délai, l’alerte quitte la carte et la base. De 1 à 12 heures.</p>
   <div class="wa-field-row">
-    <input id="duree" name="duree_heures" type="number" inputmode="numeric" min="1" max="12" required value="{{ reglages.duree_heures }}">
+    <div class="wa-field">
+      <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="clock" %}</span>
+      <input id="duree" name="duree_heures" type="number" inputmode="numeric" min="1" max="12" required value="{{ reglages.duree_heures }}">
+    </div>
     <span>heures</span>
   </div>
 
-  <label for="seuil">Votes « c’est dégagé »</label>
+  <label for="seuil">{% include "admin/icone.html" with name="check" %} Votes « c’est dégagé »</label>
   <p class="wa-field-help">Des usagers distincts. Le dernier vote retire l’alerte aussitôt. De 2 à 5.</p>
   <div class="wa-field-row">
-    <input id="seuil" name="seuil_degage" type="number" inputmode="numeric" min="2" max="5" required value="{{ reglages.seuil_degage }}">
+    <div class="wa-field">
+      <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="check" %}</span>
+      <input id="seuil" name="seuil_degage" type="number" inputmode="numeric" min="2" max="5" required value="{{ reglages.seuil_degage }}">
+    </div>
     <span>votes</span>
   </div>
 
-  <label for="plafond">Plafond par navigateur</label>
+  <label for="plafond">{% include "admin/icone.html" with name="gauge" %} Plafond par navigateur</label>
   <p class="wa-field-help">Nombre de signalements qu’un même navigateur peut publier en une heure. De 1 à 24.</p>
   <div class="wa-field-row">
-    <input id="plafond" name="plafond_heure" type="number" inputmode="numeric" min="1" max="24" required value="{{ reglages.plafond_heure }}">
+    <div class="wa-field">
+      <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="gauge" %}</span>
+      <input id="plafond" name="plafond_heure" type="number" inputmode="numeric" min="1" max="24" required value="{{ reglages.plafond_heure }}">
+    </div>
     <span>par heure</span>
   </div>
 
-  <button class="wa-btn wa-btn-dark" type="submit">Enregistrer</button>
+  <button class="wa-btn wa-btn-dark" type="submit">{% include "admin/icone.html" with name="check" %} Enregistrer</button>
 </form>
 {% endblock %}

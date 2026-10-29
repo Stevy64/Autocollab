@@ -244,6 +244,45 @@ h1, h2, p { margin: 0; }
 .wa-btn-danger { background: #fff; color: var(--wa-red); border-color: #f3d0ce; }
 .wa-btn-block { width: 100%; }
 .wa-btn:hover { transform: translateY(-1px); }
+.wa-btn { gap: 8px; }
+.wa-btn svg { flex: none; }
+.wa-metric-label { display: inline-flex; align-items: center; gap: 6px; }
+.wa-metric-label svg { width: 16px; height: 16px; }
+.wa-metric.is-ink .wa-metric-label svg { stroke: #fff; }
+.wa-form label,
+.wa-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.wa-form label svg,
+.wa-settings label svg { color: var(--wa-muted); }
+.wa-field { position: relative; display: flex; align-items: center; }
+.wa-field-grow { flex: 1 1 180px; }
+.wa-field-ico {
+  position: absolute;
+  left: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--wa-muted);
+  pointer-events: none;
+}
+.wa-field input,
+.wa-field select { width: 100%; padding-left: 42px !important; }
+.wa-check { gap: 8px; }
+.wa-check svg { color: var(--wa-muted); }
+.wa-empty-ico {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 10px;
+  border-radius: 50%;
+  background: var(--wa-soft);
+  color: var(--wa-ink);
+}
+.wa-text-link { display: inline-flex; align-items: center; gap: 6px; }
+.wa-login-card .wa-text-link { margin-top: 8px; }
 
 .wa-metrics {
   display: grid;
@@ -396,7 +435,7 @@ h1, h2, p { margin: 0; }
 .wa-settings label { margin-top: 10px; font-weight: 700; }
 .wa-field-help { color: var(--wa-muted); font-size: 0.9rem; }
 .wa-field-row { display: flex; align-items: center; gap: 10px; }
-.wa-field-row input { width: 120px; }
+.wa-field-row .wa-field { width: 148px; }
 .wa-field-row span { color: var(--wa-muted); }
 .wa-settings .wa-btn { margin-top: 16px; }
 .wa-text-link { color: var(--wa-ink); font-weight: 600; }

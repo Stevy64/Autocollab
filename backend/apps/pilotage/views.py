@@ -1,5 +1,6 @@
 """Console d'administration. Le jeton n'est jamais journalisé."""
 
+import re
 from datetime import timedelta
 
 from django.db import transaction
@@ -28,6 +29,22 @@ from .reglages import (
 )
 
 _JOURS = ("lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim.")
+_IDENTIFIANT = re.compile(r"^[a-z0-9][a-z0-9._-]{1,39}$")
+
+
+def _compte_saisi(data):
+    brut = data.get("email") if isinstance(data.get("email"), str) else ""
+    if not brut and isinstance(data.get("identifiant"), str):
+        brut = data.get("identifiant")
+    propre = brut.strip().lower()
+    if "@" in propre:
+        email = email_propre(propre)
+        if not email:
+            return None
+        return Compte.objects.filter(email=email).first()
+    if _IDENTIFIANT.match(propre):
+        return Compte.objects.filter(email=propre).first()
+    return None
 
 
 def _entier(valeur, bas, haut):
@@ -110,11 +127,10 @@ def entree(request):
     data, message = lire_json(request)
     if message:
         return erreur(message)
-    email = email_propre(data.get("email"))
     mot = data.get("mot_de_passe") if isinstance(data.get("mot_de_passe"), str) else ""
-    compte = Compte.objects.filter(email=email).first() if email else None
-    if compte is None or not correspond(mot, compte.secret):
-        return erreur("Email ou mot de passe incorrect.", status=401)
+    compte = _compte_saisi(data)
+    if compte is None or not correspond(mot, compte.secret, minimum=4):
+        return erreur("Identifiant ou mot de passe incorrect.", status=401)
     promu = False
     with transaction.atomic():
         verrou = Compte.objects.select_for_update().get(pk=compte.pk)

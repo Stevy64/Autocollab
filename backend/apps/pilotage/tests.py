@@ -74,6 +74,32 @@ class AdminConsoleTests(TestCase):
         )
         self.assertEqual(refuse.status_code, 403)
 
+    def test_short_identifiant_opens_the_console_without_a_journal_leak(self):
+        from apps.comptes.secrets import chiffrer, correspond, nouveau_jeton
+
+        secret = chiffrer("court")
+        self.assertFalse(correspond("court", secret))
+        self.assertTrue(correspond("court", secret, minimum=4))
+        Compte.objects.create(email="garde", secret=secret, jeton=nouveau_jeton(), est_admin=True)
+        with self.assertLogs("wayize", level="INFO") as captured:
+            entree = _post(
+                self.client,
+                "/api/admin/entree/",
+                {"email": "garde", "mot_de_passe": "court"},
+            )
+        self.assertEqual(entree.status_code, 200, entree.content)
+        self.assertTrue(entree.json()["compte"]["est_admin"])
+        journal = "\n".join(captured.output)
+        self.assertIn("admin.login", journal)
+        self.assertNotIn("court", journal)
+        self.assertNotIn("garde", journal)
+        trop_court = _post(
+            self.client,
+            "/api/admin/entree/",
+            {"email": "garde", "mot_de_passe": "abc"},
+        )
+        self.assertEqual(trop_court.status_code, 401)
+
     def test_settings_change_lifetime_threshold_and_hourly_cap(self):
         _inscrire(self.client, "ada@wayize.ga")
         entree = _post(

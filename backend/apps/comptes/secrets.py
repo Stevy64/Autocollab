@@ -28,12 +28,14 @@ def chiffrer(mot, sel=None):
     return f"pbkdf2${sel}${digest.hex()}"
 
 
-def correspond(mot, stocke):
+def correspond(mot, stocke, minimum=8):
     try:
         algo, sel, _digest = stocke.split("$", 2)
     except ValueError:
         return False
-    if algo != "pbkdf2" or not mot_valide(mot):
+    if algo != "pbkdf2" or not isinstance(mot, str):
+        return False
+    if not (minimum <= len(mot) <= 72):
         return False
     return hmac.compare_digest(chiffrer(mot, sel), stocke)
 

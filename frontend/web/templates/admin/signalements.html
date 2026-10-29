@@ -11,15 +11,21 @@
 
 <form class="wa-filters" method="get" action="{% url 'admin-signalements' %}">
   <label class="wa-sr" for="q">Recherche</label>
-  <input id="q" name="q" type="search" placeholder="Quartier ou mot" value="{{ filtre.q }}" maxlength="80">
+  <div class="wa-field wa-field-grow">
+    <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="search" %}</span>
+    <input id="q" name="q" type="search" placeholder="Quartier ou mot" value="{{ filtre.q }}" maxlength="80">
+  </div>
   <label class="wa-sr" for="type">Type</label>
-  <select id="type" name="type">
-    <option value="">Tous les types</option>
-    {% for type in types %}
-    <option value="{{ type.id }}"{% if filtre.type == type.id %} selected{% endif %}>{{ type.label }}</option>
-    {% endfor %}
-  </select>
-  <button class="wa-btn wa-btn-dark" type="submit">Filtrer</button>
+  <div class="wa-field">
+    <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="pin" %}</span>
+    <select id="type" name="type">
+      <option value="">Tous les types</option>
+      {% for type in types %}
+      <option value="{{ type.id }}"{% if filtre.type == type.id %} selected{% endif %}>{{ type.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="wa-btn wa-btn-dark" type="submit">{% include "admin/icone.html" with name="search" %} Filtrer</button>
 </form>
 
 {% if lignes %}
@@ -36,13 +42,14 @@
       {% csrf_token %}
       <input type="hidden" name="type" value="{{ filtre.type }}">
       <input type="hidden" name="q" value="{{ filtre.q }}">
-      <button class="wa-btn wa-btn-danger" type="submit">Retirer</button>
+      <button class="wa-btn wa-btn-danger" type="submit">{% include "admin/icone.html" with name="trash" %} Retirer</button>
     </form>
   </li>
   {% endfor %}
 </ul>
 {% else %}
 <section class="wa-card wa-empty">
+  <span class="wa-empty-ico" aria-hidden="true">{% include "admin/icone.html" with name="pin" %}</span>
   <h2>Rien à modérer</h2>
   <p>Les alertes expirées quittent déjà la base. Un signalement encore visible sur la carte apparaît ici.</p>
 </section>
