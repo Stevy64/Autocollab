@@ -30,12 +30,12 @@
       {% endif %}
       <form method="post" action="{% url 'admin-connexion' %}" class="wa-form">
         {% csrf_token %}
-        <label for="email">{% include "admin/icone.html" with name="user" %} Identifiant</label>
+        <label for="email">Identifiant</label>
         <div class="wa-field">
           <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="user" %}</span>
           <input id="email" name="email" type="text" autocomplete="username" required maxlength="254" value="{{ email }}" placeholder="Email ou identifiant">
         </div>
-        <label for="mot">{% include "admin/icone.html" with name="lock" %} Mot de passe</label>
+        <label for="mot">Mot de passe</label>
         <div class="wa-field">
           <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="lock" %}</span>
           <input id="mot" name="mot_de_passe" type="password" autocomplete="current-password" required minlength="4" maxlength="72" placeholder="Mot de passe">

@@ -9,32 +9,59 @@
   </div>
 </header>
 
-{% if admins_n == 1 %}
-<p class="wa-note wa-note-card">Un seul administrateur pour le moment. Son droit ne peut pas être retiré.</p>
-{% endif %}
-
-{% if lignes %}
-<ul class="wa-list">
-  {% for ligne in lignes %}
-  <li class="wa-row wa-row-account">
-    <div class="wa-row-copy">
-      <p class="wa-row-kicker">Depuis le {{ ligne.quand }}{% if ligne.id == moi %} · <span class="wa-pill">Vous</span>{% endif %}</p>
-      <h2>{{ ligne.email }}</h2>
-    </div>
-    <form class="wa-rights" method="post" action="{% url 'admin-compte' ligne.id %}">
-      {% csrf_token %}
-      <label class="wa-check"><input type="checkbox" name="premium" value="1"{% if ligne.premium %} checked{% endif %}> {% include "admin/icone.html" with name="star" %} Premium</label>
-      <label class="wa-check"><input type="checkbox" name="est_admin" value="1"{% if ligne.est_admin %} checked{% endif %}> {% include "admin/icone.html" with name="shield" %} Admin</label>
-      <button class="wa-btn wa-btn-dark" type="submit">{% include "admin/icone.html" with name="check" %} Enregistrer</button>
-    </form>
-  </li>
-  {% endfor %}
-</ul>
-{% else %}
-<section class="wa-card wa-empty">
-  <span class="wa-empty-ico" aria-hidden="true">{% include "admin/icone.html" with name="users" %}</span>
-  <h2>Aucun compte</h2>
-  <p>Les comptes se créent depuis la carte.</p>
+<section class="wa-panel">
+  {% if admins_n == 1 %}
+  <div class="wa-banner">
+    <span aria-hidden="true">{% include "admin/icone.html" with name="shield" %}</span>
+    <p>Un seul administrateur pour le moment. Son droit ne peut pas être retiré.</p>
+  </div>
+  {% endif %}
+  {% if lignes %}
+  <div class="wa-panel-label"><span>Compte</span><span>Droits</span></div>
+  <ul class="wa-list">
+    {% for ligne in lignes %}
+    <li class="wa-row wa-row-account">
+      <div class="wa-person">
+        <span class="wa-avatar wa-avatar-lg" aria-hidden="true">{{ ligne.email|slice:":1"|upper }}</span>
+        <div class="wa-person-copy">
+          <h2>{{ ligne.email }}</h2>
+          <p>Depuis le {{ ligne.quand }}{% if ligne.id == moi %} <span class="wa-you">Vous</span>{% endif %}</p>
+        </div>
+      </div>
+      <form class="wa-rights" method="post" action="{% url 'admin-compte' ligne.id %}">
+        {% csrf_token %}
+        <label class="wa-switch is-premium">
+          <input type="checkbox" name="premium" value="1"{% if ligne.premium %} checked{% endif %}>
+          <span class="wa-switch-ui">
+            <span class="wa-switch-track" aria-hidden="true"></span>
+            <span class="wa-switch-copy">{% include "admin/icone.html" with name="star" %} Premium</span>
+          </span>
+        </label>
+        <label class="wa-switch is-admin{% if admins_n == 1 and ligne.est_admin %} is-locked{% endif %}"{% if admins_n == 1 and ligne.est_admin %} title="Il reste un seul administrateur"{% endif %}>
+          {% if admins_n == 1 and ligne.est_admin %}
+          <input type="checkbox" checked disabled>
+          {% else %}
+          <input type="checkbox" name="est_admin" value="1"{% if ligne.est_admin %} checked{% endif %}>
+          {% endif %}
+          <span class="wa-switch-ui">
+            <span class="wa-switch-track" aria-hidden="true"></span>
+            <span class="wa-switch-copy">{% include "admin/icone.html" with name="shield" %} Admin</span>
+          </span>
+        </label>
+        {% if admins_n == 1 and ligne.est_admin %}
+        <input type="hidden" name="est_admin" value="1">
+        {% endif %}
+        <button class="wa-btn wa-btn-dark" type="submit">{% include "admin/icone.html" with name="check" %} Enregistrer</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="wa-empty">
+    <span class="wa-empty-ico" aria-hidden="true">{% include "admin/icone.html" with name="users" %}</span>
+    <h2>Aucun compte</h2>
+    <p>Les comptes se créent depuis la carte.</p>
+  </div>
+  {% endif %}
 </section>
-{% endif %}
 {% endblock %}

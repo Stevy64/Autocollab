@@ -29,6 +29,24 @@
     });
   }
 
+  document.querySelectorAll(".wa-rights").forEach(function (form) {
+    const button = form.querySelector("[type=submit]");
+    if (!button) return;
+    function snapshot() {
+      return Array.from(form.querySelectorAll("input[type=checkbox]")).map(function (input) {
+        return (input.name || "x") + ":" + (input.checked ? "1" : "0");
+      }).join("|");
+    }
+    const initial = snapshot();
+    function sync() {
+      const idle = snapshot() === initial;
+      button.disabled = idle;
+      button.classList.toggle("is-idle", idle);
+    }
+    form.addEventListener("change", sync);
+    sync();
+  });
+
   document.querySelectorAll("[data-confirm]").forEach(function (form) {
     form.addEventListener("submit", function (event) {
       const message = form.getAttribute("data-confirm");

@@ -34,7 +34,8 @@
   <article class="wa-metric is-ink">
     <span class="wa-metric-label">{% include "admin/icone.html" with name="clock" %} Durée d’une alerte</span>
     <strong>{{ reglages.duree_heures }} h</strong>
-    <span class="wa-metric-sub">{{ reglages.seuil_degage }} votes pour retirer · {{ reglages.plafond_heure }} / h</span>
+    <span class="wa-metric-sub">{{ reglages.seuil_degage }} votes pour retirer</span>
+    <span class="wa-metric-sub">{{ reglages.plafond_heure }} par heure</span>
   </article>
 </section>
 
@@ -62,7 +63,7 @@
         <p class="wa-kicker">Types</p>
         <h2>Répartition</h2>
       </div>
-      <a class="wa-text-link" href="{% url 'admin-signalements' %}">Voir la liste</a>
+      <a class="wa-text-link" href="{% url 'admin-signalements' %}">Voir la liste {% include "admin/icone.html" with name="arrow" %}</a>
     </div>
     <ul class="wa-split">
       {% for ligne in par_type %}

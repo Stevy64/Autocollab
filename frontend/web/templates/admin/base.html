@@ -27,6 +27,7 @@
       {% include "admin/icone.html" with name="chevron" %}
     </button>
     <nav class="wa-nav" aria-label="Administration">
+      <p class="wa-nav-label"><span>Pilotage</span></p>
       <a class="wa-nav-item{% if nav == 'apercu' %} is-active{% endif %}" href="{% url 'admin-apercu' %}" {% if nav == 'apercu' %}aria-current="page"{% endif %} title="Vue d’ensemble">
         <span class="wa-ico">{% include "admin/icone.html" with name="grid" %}</span>
         <span class="wa-label">Vue d’ensemble</span>

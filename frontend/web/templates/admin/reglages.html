@@ -13,38 +13,44 @@
 <div class="wa-flash is-error" role="alert">{{ erreur }}</div>
 {% endif %}
 
-<form class="wa-card wa-settings" method="post" action="{% url 'admin-reglages' %}">
+<form class="wa-panel wa-settings" method="post" action="{% url 'admin-reglages' %}">
   {% csrf_token %}
-  <label for="duree">{% include "admin/icone.html" with name="clock" %} Durée de vie d’une alerte</label>
-  <p class="wa-field-help">Passé ce délai, l’alerte quitte la carte et la base. De 1 à 12 heures.</p>
-  <div class="wa-field-row">
-    <div class="wa-field">
-      <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="clock" %}</span>
-      <input id="duree" name="duree_heures" type="number" inputmode="numeric" min="1" max="12" required value="{{ reglages.duree_heures }}">
+  <div class="wa-set">
+    <div>
+      <label for="duree">{% include "admin/icone.html" with name="clock" %} Durée de vie d’une alerte</label>
+      <p class="wa-field-help">Passé ce délai, l’alerte quitte la carte et la base. De 1 à 12 heures.</p>
     </div>
-    <span>heures</span>
+    <div class="wa-set-value">
+      <input class="wa-num" id="duree" name="duree_heures" type="number" inputmode="numeric" min="1" max="12" required value="{{ reglages.duree_heures }}">
+      <span>heures</span>
+    </div>
   </div>
 
-  <label for="seuil">{% include "admin/icone.html" with name="check" %} Votes « c’est dégagé »</label>
-  <p class="wa-field-help">Des usagers distincts. Le dernier vote retire l’alerte aussitôt. De 2 à 5.</p>
-  <div class="wa-field-row">
-    <div class="wa-field">
-      <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="check" %}</span>
-      <input id="seuil" name="seuil_degage" type="number" inputmode="numeric" min="2" max="5" required value="{{ reglages.seuil_degage }}">
+  <div class="wa-set">
+    <div>
+      <label for="seuil">{% include "admin/icone.html" with name="check" %} Votes « c’est dégagé »</label>
+      <p class="wa-field-help">Des usagers distincts. Le dernier vote retire l’alerte aussitôt. De 2 à 5.</p>
     </div>
-    <span>votes</span>
+    <div class="wa-set-value">
+      <input class="wa-num" id="seuil" name="seuil_degage" type="number" inputmode="numeric" min="2" max="5" required value="{{ reglages.seuil_degage }}">
+      <span>votes</span>
+    </div>
   </div>
 
-  <label for="plafond">{% include "admin/icone.html" with name="gauge" %} Plafond par navigateur</label>
-  <p class="wa-field-help">Nombre de signalements qu’un même navigateur peut publier en une heure. De 1 à 24.</p>
-  <div class="wa-field-row">
-    <div class="wa-field">
-      <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="gauge" %}</span>
-      <input id="plafond" name="plafond_heure" type="number" inputmode="numeric" min="1" max="24" required value="{{ reglages.plafond_heure }}">
+  <div class="wa-set">
+    <div>
+      <label for="plafond">{% include "admin/icone.html" with name="gauge" %} Plafond par navigateur</label>
+      <p class="wa-field-help">Nombre de signalements qu’un même navigateur peut publier en une heure. De 1 à 24.</p>
     </div>
-    <span>par heure</span>
+    <div class="wa-set-value">
+      <input class="wa-num" id="plafond" name="plafond_heure" type="number" inputmode="numeric" min="1" max="24" required value="{{ reglages.plafond_heure }}">
+      <span>par heure</span>
+    </div>
   </div>
 
-  <button class="wa-btn wa-btn-dark" type="submit">{% include "admin/icone.html" with name="check" %} Enregistrer</button>
+  <div class="wa-panel-foot">
+    <p>Appliqué tout de suite sur la carte.</p>
+    <button class="wa-btn wa-btn-dark" type="submit">{% include "admin/icone.html" with name="check" %} Enregistrer</button>
+  </div>
 </form>
 {% endblock %}
