@@ -37,8 +37,8 @@
   --wa-bg: #e7edf2;
   --wa-red: #e10600;
   --wa-green: #157a45;
-  --wa-shadow: 0 12px 32px rgba(28, 28, 30, 0.07);
-  --wa-radius: 24px;
+  --wa-shadow: 0 16px 40px rgba(28, 28, 30, 0.08);
+  --wa-radius: 28px;
   --wa-side: 248px;
   --wa-font: "DM Sans", "Segoe UI", sans-serif;
 }
@@ -567,7 +567,17 @@ h1, h2, p { margin: 0; }
   box-shadow: none;
 }
 .wa-row:last-child { border-bottom: 0; }
-.wa-report { display: block; padding: 12px 16px 14px; }
+.wa-report { display: block; position: relative; padding: 14px 16px 14px 20px; }
+.wa-report::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--wa-red);
+}
 .wa-report-head {
   display: flex;
   align-items: center;

@@ -266,7 +266,7 @@ function visiblePx() {
   const raw = getComputedStyle(document.documentElement).getPropertyValue("--sheet-visible").trim();
   if (raw.endsWith("px")) return parseFloat(raw);
   if (raw.endsWith("dvh") || raw.endsWith("vh")) return (window.innerHeight * parseFloat(raw)) / 100;
-  return window.innerHeight * 0.46;
+  return window.innerHeight * 0.42;
 }
 
 function sheetCeiling() {
@@ -286,7 +286,8 @@ function setVisible(px) {
 
 function snapPoints() {
   const height = window.innerHeight;
-  return [108, Math.round(height * 0.46), sheetCeiling()];
+  const peek = Math.round(Math.max(320, Math.min(390, height * 0.42)));
+  return [112, peek, sheetCeiling()];
 }
 
 function snapTo(px) {
@@ -722,8 +723,8 @@ function itemHtml(report) {
           <span class="item-title">${esc(report.lieu)}</span>
           <span class="item-count">×${report.appuis}</span>
         </span>
-        <span class="item-meta">${esc(meta)}</span>
         <span class="item-excerpt">${esc(report.commentaire)}</span>
+        <span class="item-meta">${esc(meta)}</span>
         ${report.degages ? `<span class="item-clear">${uiIcon("clear", 14)} Dégagé ×${report.degages}</span>` : ""}
       </span>
     </button>`;
@@ -770,15 +771,13 @@ function renderFeed() {
   return `
     <div class="feed-bar">
       <div class="sheet-head">
-        <div>
-          <h1>En ce moment</h1>
-          <p>${esc(subtitle)}</p>
-          ${placeNote}
-        </div>
+        <h1>En ce moment</h1>
         <div class="sheet-actions">
           <button type="button" class="btn btn-ghost btn-compact" data-action="compte">${uiIcon(compteIcon)} ${compteLabel}</button>
           <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("alarm")} Signaler</button>
         </div>
+        <p>${esc(subtitle)}</p>
+        ${placeNote}
       </div>
       ${offlineNote()}
       <div class="chips" role="toolbar" aria-label="Filtrer les signalements">
@@ -1590,7 +1589,7 @@ function ouvrirCompte() {
   state.mode = "compte";
   state.compteErreur = "";
   state.picking = false;
-  if (!isDesktop()) setVisible(snapPoints()[2]);
+  if (!isDesktop()) setVisible(state.compte ? snapPoints()[2] : Math.min(430, sheetCeiling()));
   render();
 }
 
@@ -1609,6 +1608,7 @@ async function envoyerCompte(inscription) {
     state.compteEnCours = false;
     appliquerCompte(data.compte, data.jeton);
     toast(inscription ? "Compte créé." : "Vous êtes connecté.");
+    if (!isDesktop() && state.mode === "compte") setVisible(snapPoints()[2]);
     render();
   } catch (error) {
     state.compteEnCours = false;
