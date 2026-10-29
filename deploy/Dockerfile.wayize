@@ -1,0 +1,29 @@
+# Image des deux processus Wayizé (API et frontal).
+# Le workflow deploy/wayize-image.yml la publie sur GHCR.
+# La clé ci-dessous ne sert qu'à collectstatic pendant la construction.
+# Les vraies clés sont des Secrets Kubernetes, pas dans git.
+
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=wayize_web.prod \
+    DJANGO_SECRET_KEY=construction-de-limage-seulement-pas-la-cle-reelle
+
+WORKDIR /app
+
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+RUN python frontend/manage.py collectstatic --noinput \
+    && chown -R app:app /app
+
+USER app
+
+# Kubernetes ignore cette ligne et utilise les sondes du Deployment.
+# Elle compte si le conteneur est lancé à la main : l'API écoute 8648, le frontal 8647.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["python", "-c", "import urllib.request\nurls=('http://127.0.0.1:8648/api/sante/','http://127.0.0.1:8647/sante/')\nok=False\nfor u in urls:\n    try:\n        urllib.request.urlopen(u, timeout=2)\n        ok=True\n    except Exception:\n        pass\nraise SystemExit(0 if ok else 1)\n"]
