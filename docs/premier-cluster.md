@@ -12,6 +12,10 @@ Vous n’avez pas besoin d’avoir déjà utilisé Kubernetes. Les mots qui revi
 
 k3s est le bon choix ici : c’est un Kubernetes complet en un seul programme, prévu pour une petite machine, et il amène déjà Traefik pour recevoir les sous-domaines.
 
+Lisez ce guide de haut en bas. Les étapes 1 à 7 préparent la machine, une seule fois. L’étape 8 crée le tiroir de Wayizé, l’étape 9 son nom de domaine, l’étape 10 l’installe. À l’étape 10.1, faites le choix A ou le choix B, puis continuez à l’étape 10.2. Ne revenez pas en arrière. L’étape 11 envoie vers le guide de l’application suivante. Chacun de ces guides a sa propre suite 1, 2, 3, et ne reprend pas les numéros de celui-ci.
+
+Dans le terminal, on ne colle que le contenu d’un bloc de commandes (le cadre gris), puis on attend qu’il se termine. Les titres, les phrases et les lignes « Ça a marché si » ne sont pas des commandes. Si le shell répond `command not found` sur un mot français, ce mot a été collé par erreur : on l’ignore, on n’installe rien.
+
 ## Les deux valeurs à remplir
 
 Notez-les avant de commencer. Le guide ne les invente pas.
@@ -193,11 +197,19 @@ Deux façons de garder les données. Le reste (image, frontal, certificat, mise 
 
 `WAYIZE_SEED=0` évite d’insérer les signalements d’exemple. Le module `prod` refuse une clé trop courte ou qui commence par `dev-only-`.
 
-Si vous restez sur un seul processus, suivez les blocs **SQLite** et sautez la section 10.3. Si vous voulez Postgres pour Wayizé, faites la section 10.3 avant les blocs **Postgres**.
+Si vous restez sur un seul processus, suivez les blocs **SQLite** et sautez la section 10.2. Si vous voulez Postgres pour Wayizé, faites la section 10.2 avant les blocs **Postgres**. Les applications de l’étape 11 utilisent ce même Postgres : ne sautez la section 10.2 que si Wayizé reste seul sur ce VPS.
 
-### 10.1 Image, construite par GitHub Actions
+### 10.1 Obtenir l’image
 
-Le dépôt public peut construire l’image sur les runners gratuits `ubuntu-latest`, puis la déposer sur GHCR (le registre d’images de GitHub, inclus avec le dépôt). Le VPS la télécharge. GitHub n’ouvre pas de session SSH et n’envoie pas de mot de passe.
+Faites l’un des deux choix, pas les deux. Notez la lettre : elle revient à l’étape 10.6.
+
+Le choix A dépose l’image sur GHCR. Les manifests plus bas disent alors `ghcr.io/stevy64/wayize:main` et `imagePullPolicy: Always`.
+
+Le choix B construit l’image sur le VPS. Dans les manifests des étapes 10.4 et 10.5, remplacez chaque `ghcr.io/stevy64/wayize:main` par `docker.io/library/wayize:1`, et chaque `imagePullPolicy: Always` par `imagePullPolicy: Never`. L’image nginx ne change pas.
+
+#### Choix A — GitHub Actions
+
+Le dépôt public peut construire l’image sur les runners gratuits `ubuntu-latest`, puis la déposer sur GHCR. Le VPS la télécharge. GitHub n’ouvre pas de session SSH et n’envoie pas de mot de passe.
 
 Deux fichiers d’exemple sont déjà dans le dépôt, pas dans le code de l’application :
 
@@ -230,8 +242,6 @@ Ouvrez l’onglet Actions du dépôt. Le job `build` doit devenir vert. L’imag
 
 Ça a marché si le job Actions est vert et si le journal dit que l’image a été poussée.
 
-### 10.2 Le cluster télécharge l’image
-
 GHCR laisse souvent le paquet privé, même pour un dépôt public. Pour ce dépôt public, le plus simple est de rendre le paquet public : sur GitHub, paquet `wayize`, réglage du paquet, visibilité publique. Le VPS le tire alors sans jeton.
 
 ```bash
@@ -260,11 +270,37 @@ imagePullSecrets:
 
 Les manifests plus bas supposent le paquet public. L’image est `ghcr.io/stevy64/wayize:main` et `imagePullPolicy: Always`, pour qu’une mise à jour télécharge de nouveau l’étiquette `main`.
 
-### 10.3 Postgres du cluster
+Passez à l’étape 10.2.
+
+#### Choix B — Construire sur le VPS
+
+Le VPS n’a pas de registre. On construit l’image sur place et k3s l’utilise sans aller la chercher sur Internet. Docker ne fait que la construction : les pods restent ceux de k3s.
+
+Si `/srv/wayize` existe déjà, ne clonez pas une seconde fois.
+
+```bash
+sudo apt install -y docker.io
+sudo mkdir -p /srv/wayize
+sudo chown "$USER:$USER" /srv/wayize
+if [ ! -d /srv/wayize/.git ]; then
+  git clone https://github.com/Stevy64/Autocollab.git /srv/wayize
+fi
+cd /srv/wayize
+git pull --ff-only
+sudo docker build -f deploy/Dockerfile.wayize -t wayize:1 .
+sudo docker save wayize:1 | sudo k3s ctr images import -
+sudo k3s ctr images ls | grep wayize
+```
+
+Ça a marché si `grep` affiche `docker.io/library/wayize:1`.
+
+`Never` interdit à k3s d’interroger un registre : l’image doit déjà être dans `k3s ctr images ls`. Passez à l’étape 10.2.
+
+### 10.2 Postgres du cluster
 
 Une seule instance pour tout le VPS, dans le namespace `donnees`. Chaque application a sa base et son utilisateur, dont le mot de passe est un Secret de son namespace. Rien de cela ne va dans git. Le Service n’a pas d’Ingress : le port 5432 ne sort pas du cluster.
 
-L’image officielle démarre en root le temps de préparer le disque, puis continue en utilisateur `postgres`. On ne la force pas en non-root.
+Le conteneur démarre avec l’utilisateur `postgres` (uid 999). `fsGroup` rend le disque accessible à ce groupe. On ne passe pas par `gosu` : sur ce VPS, `gosu` reste bloqué, le journal reste vide, et la sonde répond `no response`. L’annotation AppArmor est nécessaire sur Ubuntu : sans elle, la reprise après un arrêt brutal échoue avec `could not signal for checkpoint: Permission denied` et le pod ne devient jamais prêt.
 
 ```bash
 kubectl create namespace donnees --dry-run=client -o yaml | kubectl apply -f -
@@ -300,8 +336,12 @@ spec:
     metadata:
       labels:
         app: postgres
+      annotations:
+        container.apparmor.security.beta.kubernetes.io/postgres: unconfined
     spec:
       securityContext:
+        runAsUser: 999
+        runAsGroup: 999
         fsGroup: 999
       containers:
         - name: postgres
@@ -343,15 +383,26 @@ spec:
     - port: 5432
       targetPort: 5432
 EOF
+sudo k3s ctr images pull docker.io/library/postgres:16
 kubectl apply -f "$HOME/k8s/postgres.yaml"
-kubectl -n donnees rollout status deployment/postgres --timeout=180s
+kubectl -n donnees rollout status deployment/postgres --timeout=300s
+kubectl -n donnees get pods
 ```
 
-`PGDATA` est un sous-dossier du disque. Au premier démarrage ce disque n’est pas toujours vide, et Postgres refuse alors de créer la base. `Recreate` arrête l’ancien pod avant d’en lancer un autre : ce disque ne se monte que sur un pod à la fois.
+Le champ `PGDATA` du manifeste est un sous-dossier du disque. Au premier démarrage ce disque n’est pas toujours vide, et Postgres refuse alors de créer la base. `Recreate` arrête l’ancien pod avant d’en lancer un autre : ce disque ne se monte que sur un pod à la fois.
 
 Si `create secret` répond `already exists`, ne le refaites pas : le mot de passe déjà enregistré est celui du disque.
 
-Ça a marché si le pod `postgres` est `Running` et `READY` 1/1. `kubectl -n donnees get svc postgres` ne doit pas afficher d’adresse externe.
+Ça a marché si `get pods` affiche `Running` et `1/1`. `kubectl -n donnees get svc postgres` ne doit pas afficher d’adresse externe.
+
+Si le rollout affiche `timed out`, le pod n’est pas prêt. On ne lance pas `psql`. On colle seulement ce bloc, et on lit la dernière ligne `Warning` ainsi que les journaux :
+
+```bash
+kubectl -n donnees describe pod -l app=postgres | tail -n 40
+kubectl -n donnees logs deploy/postgres --tail=50
+```
+
+`ImagePullBackOff` ou `ErrImagePull` : le téléchargement a échoué. Relancez `sudo k3s ctr images pull docker.io/library/postgres:16`, puis `kubectl -n donnees delete pod -l app=postgres`, puis le `rollout status`. `CrashLoopBackOff` : le journal dit pourquoi. On ne passe à la base Wayizé qu’une fois le pod `1/1`.
 
 Une base par application. Ici, Wayizé. Le mot de passe reste dans le Secret `wayize-api` (`DATABASE_URL`), pas dans un fichier du dépôt. Cette commande ne quitte pas le VPS.
 
@@ -363,13 +414,13 @@ CREATE DATABASE wayize OWNER wayize;
 SQL
 ```
 
-Gardez `APP_PW` le temps d’écrire `DATABASE_URL` à la section 10.4, puis cette section fera `unset APP_PW`.
+Gardez `APP_PW` le temps d’écrire `DATABASE_URL` à la section 10.3, puis cette section fera `unset APP_PW`.
 
 Ça a marché si `psql` répond deux fois `CREATE`.
 
 Pour l’application suivante, les mêmes deux lignes SQL avec un autre nom (`CREATE USER autre ...`, `CREATE DATABASE autre OWNER autre`). Pas un second Deployment Postgres.
 
-### 10.4 Variables
+### 10.3 Variables
 
 Les clés sont générées sur le VPS. `token_urlsafe` donne un mot qui peut entrer dans une URL tel quel.
 
@@ -400,7 +451,7 @@ WAYIZE_SQLITE_PATH=/data/db.sqlite3
 EOF
 ```
 
-**Postgres** — seulement après la section 10.3. Le mot de passe est celui de la base `wayize`, pas celui de l’administrateur Postgres. `sslmode=disable` convient ici : le Service n’est pas publié sur Internet. Pour une base OVH hors du VPS, reprenez `sslmode=require` comme dans `docs/ovh-clusters.md`.
+**Postgres** — seulement après la section 10.2. Le mot de passe est celui de la base `wayize`, pas celui de l’administrateur Postgres. `sslmode=disable` convient ici : le Service n’est pas publié sur Internet. Pour une base OVH hors du VPS, reprenez `sslmode=require` comme dans `docs/ovh-clusters.md`.
 
 ```bash
 sudo tee /etc/wayize/api.env >/dev/null <<EOF
@@ -417,15 +468,17 @@ Puis, dans les deux cas :
 ```bash
 sudo chmod 600 /etc/wayize/web.env /etc/wayize/api.env
 unset WEB_KEY API_KEY APP_PW
-kubectl -n wayize create secret generic wayize-web --from-env-file=/etc/wayize/web.env
-kubectl -n wayize create secret generic wayize-api --from-env-file=/etc/wayize/api.env
+sudo k3s kubectl -n wayize create secret generic wayize-web --from-env-file=/etc/wayize/web.env
+sudo k3s kubectl -n wayize create secret generic wayize-api --from-env-file=/etc/wayize/api.env
 ```
+
+`kubectl` sans `sudo` ne peut pas lire ces fichiers : ils appartiennent à root et le mode 600 les ferme aux autres. L’erreur `permission denied` se règle avec `sudo k3s kubectl`, pas en changeant le mode.
 
 Si une commande répond `already exists` : `kubectl -n wayize delete secret wayize-web wayize-api`, puis relancez les deux `create`.
 
 Ça a marché si `kubectl -n wayize get secrets` liste `wayize-web` et `wayize-api`.
 
-### 10.5 API
+### 10.4 API
 
 Le frontal, à la section suivante, est identique pour les deux stockages. Seule l’API change. La sonde doit envoyer `Host: localhost`, sinon le rollout reste bloqué.
 
@@ -536,6 +589,8 @@ kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
 
 **Postgres.** Pas de disque SQLite, pas d’`initContainer` : avec plusieurs pods, chacun migrerait en même temps. Un Job unique migre, puis le Deployment démarre. Vous pouvez plus tard passer `replicas` au-dessus de 1. Ne le faites pas tant que le Job n’est pas `Complete`.
 
+Si le déploiement SQLite est déjà en service et que son disque contient des signalements, ne collez pas le bloc qui suit. Il remplacerait l’API par une base Postgres vide. Le Postgres du namespace `donnees` reste utile pour les autres applications. Wayizé, lui, garde le bloc SQLite.
+
 ```bash
 tee "$HOME/k8s/wayize-api.yaml" >/dev/null <<'EOF'
 apiVersion: batch/v1
@@ -630,7 +685,7 @@ Basculer plus tard de SQLite vers Postgres crée une base vide : les signalement
 
 Ça a marché si `rollout` se termine par `successfully rolled out`. Sur le chemin Postgres, le Job doit d’abord être `Complete` (`kubectl -n wayize get job`).
 
-### 10.6 Frontal et certificat
+### 10.5 Frontal et certificat
 
 Identique pour SQLite et Postgres. nginx est dans le pod, en non-root, port 8080. Il sert `/static/` et transmet le reste à gunicorn. Il repasse `X-Forwarded-Proto` tel que Traefik l’a reçu : Django s’en sert pour le cookie de la console. Sans ça, `/admin/` ne garde pas la session.
 
@@ -783,7 +838,13 @@ kubectl -n wayize logs deploy/wayize-web -c gunicorn
 
 Ce sont les mêmes lignes JSON que dans le README. `X-Request-Id` relie le frontal et l’API.
 
-### 10.7 Mettre à jour
+### 10.6 Mettre à jour
+
+On refait seulement cette étape à chaque publication. Les étapes 1 à 10.5 ne se rejouent pas. Le Secret, la base et les disques restent en place.
+
+La mise à jour suit la lettre notée à l’étape 10.1.
+
+#### Si vous aviez choisi A
 
 GitHub construit l’image. Le VPS va la chercher. Personne ne se connecte en SSH depuis Actions, et aucun mot de passe ne voyage dans le workflow.
 
@@ -804,6 +865,20 @@ wayize-deploy
 
 `imagePullPolicy: Always` fait retélécharger l’étiquette `main` au redémarrage des pods.
 
+#### Si vous aviez choisi B
+
+On reconstruit l’étiquette `wayize:1` et on la réimporte, puis on redémarre les pods. `imagePullPolicy: Never` prend alors l’image qui vient d’être importée.
+
+```bash
+cd /srv/wayize
+git pull --ff-only
+sudo docker build -f deploy/Dockerfile.wayize -t wayize:1 .
+sudo docker save wayize:1 | sudo k3s ctr images import -
+kubectl -n wayize rollout restart deployment/wayize-api deployment/wayize-web
+kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
+kubectl -n wayize rollout status deployment/wayize-web --timeout=180s
+```
+
 Ça a marché si les deux `rollout` se terminent par `successfully rolled out`, puis si `curl -fsS https://wayize.gabomazone.com/sante/` répond encore `"api": true`.
 
 Pour revenir au commit d’avant, remplacez `main` par le SHA affiché dans Actions (les deux conteneurs qui utilisent l’image Wayizé) :
@@ -821,16 +896,13 @@ Sur le chemin Postgres, le conteneur `migrate` est dans le Job, pas dans le Depl
 
 ## 11. L’application suivante
 
-Même cluster, même Traefik, même émetteur `letsencrypt`, même IPv4. Pas un second k3s.
+Le cluster est en place. On ne refait pas les étapes 1 à 7, ni le Postgres de l’étape 10.2. Chaque application a son guide, numéroté à partir de 1. On ouvre celui de l’application, et on le suit jusqu’au bout.
 
-1. `kubectl create namespace NOM`.
-2. Une entrée DNS `A` : le nouveau sous-domaine, cible `REMPLACER_PAR_IPV4`.
-3. Un Ingress dont `host` est ce sous-domaine, avec l’annotation `cert-manager.io/cluster-issuer: letsencrypt` et un `secretName` à lui.
-4. Copier `deploy/wayize-image.yml` vers un second workflow, changer le nom de l’image (`ghcr.io/stevy64/autre`) et les `paths`. Épingler les actions de la même façon. Le paquet GHCR se règle comme à la section 10.2.
-5. Choisir le stockage :
-   - fichier local : un PVC et `replicas: 1` dans son namespace, comme le bloc SQLite ;
-   - Postgres : les deux lignes `CREATE USER` / `CREATE DATABASE` de la section 10.3, avec le nom de l’application, et un Secret `DATABASE_URL` dans son namespace. On ne réinstalle pas Postgres.
-6. Ses Secrets restent dans son namespace. Pas ceux de `wayize`, pas le disque `wayize-data`.
-7. Un script du même genre que `wayize-deploy`, qui ne redémarre que les Deployments de ce namespace.
+| Application | Adresse | Guide |
+| --- | --- | --- |
+| Zanalyze | `zanalyze.gabomazone.com` | `docs/ovh-cluster.md` du dépôt Zanalyze |
+| Gab Event | `gabevent.gabomazone.com` | `docs/ovh-cluster.md` du dépôt Gab-Event |
+| Fallaman | `fallaman.gabomazone.com` | `Fallaman/docs/ovh-cluster.md` du dépôt Fallaman-Web |
+| Gaboma Hub | `hub.gabomazone.com` | `docs/ovh-cluster.md` du dépôt Gaboma-Hub |
 
-Le service publié est celui que le navigateur doit voir. Une API interne, comme celle de Wayizé, reste un Service sans Ingress.
+Dans chacun : un namespace, un nom de domaine, une base dans le Postgres déjà là, l’image (choix A ou choix B, le même geste qu’à l’étape 10.1), les variables du projet, puis le lancement. Le Secret et le disque de Wayizé ne sont pas réutilisés. Une API interne, comme celle de Wayizé, reste sans Ingress.
