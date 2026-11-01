@@ -306,6 +306,8 @@ const UI = {
   layers: '<path d="m12 4 8 4.2L12 12.4 4 8.2 12 4zM6.2 12.2 12 15.2l5.8-3M6.2 15.4 12 18.4l5.8-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   mail: '<rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="m5 7.5 7 5.2 7-5.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
   lock: '<rect x="6" y="10.5" width="12" height="8.2" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 10.5V8.4a3.5 3.5 0 0 1 7 0v2.1" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  eye: '<path d="M2.5 12S6.2 6.2 12 6.2 21.5 12 21.5 12 17.8 17.8 12 17.8 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  eyeOff: '<path d="M3.2 3.2 20.8 20.8M9.4 6.5A9 9 0 0 1 12 6.2c5.8 0 9.5 5.8 9.5 5.8a16 16 0 0 1-3.1 3.6M6.2 7.4C4 8.9 2.5 12 2.5 12s3.7 5.8 9.5 5.8c1.1 0 2.1-.2 3-.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10 10.2a2.6 2.6 0 0 0 3.6 3.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
   car: '<path d="M4 14.5h16M6.2 14.2 7.6 9.2A1.4 1.4 0 0 1 9 8.2h6a1.4 1.4 0 0 1 1.4 1l1.4 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="8" cy="16.2" r="1.2" fill="currentColor"/><circle cx="16" cy="16.2" r="1.2" fill="currentColor"/>',
 };
 
@@ -1855,7 +1857,7 @@ function renderCompte() {
           </ul>
           <p class="muted">Le paiement mobile money n’est pas branché. Activer Premium ici enregistre le droit sur ce serveur, sans débit.</p>
           ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
-          <button type="button" class="btn btn-primary btn-block" data-action="premium" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("star")} Activer Premium</button>
+          <button type="button" class="btn btn-primary btn-block offre-activer" data-action="premium" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("star")} Activer Premium</button>
         </section>
         ${carteInfos()}
         <button type="button" class="btn btn-ghost btn-block" data-action="sortie">${uiIcon("logout")} Se déconnecter</button>`}
@@ -2865,7 +2867,7 @@ function restaurerMemoire() {
 }
 
 function champMot(attributs) {
-  return `<div class="mot-ligne"><input id="compte-mot" class="field" type="password" ${attributs}><button type="button" class="mot-voir" data-action="voir-mot" aria-pressed="false" aria-label="Voir le mot de passe">Voir</button></div>`;
+  return `<div class="mot-ligne"><input id="compte-mot" class="field" type="password" ${attributs}><button type="button" class="mot-voir" data-action="voir-mot" aria-pressed="false" aria-label="Voir le mot de passe">${uiIcon("eye", 20)}</button></div>`;
 }
 
 function onSheetClick(event) {
@@ -2878,7 +2880,7 @@ function onSheetClick(event) {
     const visible = input.type === "password";
     input.type = visible ? "text" : "password";
     el.setAttribute("aria-pressed", visible ? "true" : "false");
-    el.textContent = visible ? "Masquer" : "Voir";
+    el.innerHTML = uiIcon(visible ? "eyeOff" : "eye", 20);
     el.setAttribute("aria-label", visible ? "Masquer le mot de passe" : "Voir le mot de passe");
     input.focus();
     return;

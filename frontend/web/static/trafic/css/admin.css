@@ -936,6 +936,17 @@ body.is-leaving .wa-progress span { animation: wa-load 0.9s ease forwards; }
   padding: 32px 28px 24px;
   border-radius: 20px;
 }
+.wa-login-shield {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  background: var(--wa-ink);
+  color: #fff;
+}
+.wa-login-shield svg { width: 24px; height: 24px; }
 .wa-login-card h1 {
   font-size: 1.75rem;
   font-weight: 700;
@@ -958,20 +969,23 @@ body.is-leaving .wa-progress span { animation: wa-load 0.9s ease forwards; }
 }
 .wa-voir {
   position: absolute;
-  right: 8px;
-  min-height: 32px;
-  padding: 0 10px;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--wa-ink);
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 700;
+  color: var(--wa-muted);
   cursor: pointer;
 }
-.wa-field:has(.wa-voir) input { padding-right: 88px; }
-.wa-voir[aria-pressed="true"] { background: var(--wa-soft); }
+.wa-voir .oeil-ferme { display: none; }
+.wa-voir[aria-pressed="true"] .oeil-ouvert { display: none; }
+.wa-voir[aria-pressed="true"] .oeil-ferme { display: block; }
+.wa-field:has(.wa-voir) input { padding-right: 48px; }
+.wa-voir[aria-pressed="true"] { background: var(--wa-soft); color: var(--wa-ink); }
 .wa-form .wa-btn { margin-top: 18px; min-height: 48px; }
 .wa-login-card .wa-note {
   margin: 18px 0 0;

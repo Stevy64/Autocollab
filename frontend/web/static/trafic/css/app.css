@@ -1138,24 +1138,30 @@ body.is-compose .sheet-content {
   background: #fafaf9;
 }
 .mot-ligne { position: relative; }
-.mot-ligne .field { padding-right: 88px; }
+.mot-ligne .field { padding-right: 48px; }
 .mot-voir {
   position: absolute;
   top: 50%;
-  right: 8px;
+  right: 6px;
   transform: translateY(-50%);
-  min-height: 32px;
-  padding: 0 10px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
+  color: var(--muted);
   cursor: pointer;
 }
-.mot-voir[aria-pressed="true"] { background: var(--soft); }
+.mot-voir[aria-pressed="true"] { background: var(--soft); color: var(--ink); }
+.offre .offre-activer {
+  margin-top: 14px;
+  background: #fff;
+  color: #171717;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+}
 .auth .btn-block { margin-top: 16px; }
 .auth-lien {
   display: inline-flex;
