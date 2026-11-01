@@ -154,7 +154,7 @@ Le paiement mobile money n’est pas branché : activer Premium enregistre le dr
 
 ## Crédits
 
-- Carte : images satellite et plan topographique [Esri](https://www.esri.com/) (Maxar, HERE, Garmin, USGS, OpenStreetMap). Le trafic en direct des cartes commerciales n'est pas branché.
+- Carte : images satellite et plan des rues [Esri](https://www.esri.com/) (Maxar, HERE, Garmin, OpenStreetMap). Le trafic en direct des cartes commerciales n'est pas branché.
 - [Leaflet](https://leafletjs.com/) 1.9.4 (BSD-2-Clause), fichiers dans `frontend/web/static/trafic/vendor/leaflet/`.
 - DM Sans, licence SIL Open Font License : `frontend/web/static/trafic/fonts/OFL.txt`.
 - Découpage des services : [Gabomazone_SPA](https://github.com/Stevy64/Gabomazone_SPA).

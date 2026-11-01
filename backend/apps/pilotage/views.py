@@ -33,6 +33,34 @@ from .reglages import (
 
 _JOURS = ("lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim.")
 _IDENTIFIANT = re.compile(r"^[a-z0-9][a-z0-9._-]{1,39}$")
+_PAGE = 40
+
+
+def _page_demandee(request):
+    n = _entier(request.GET.get("page"), 1, 10000)
+    return n or 1
+
+
+def _lien_app(valeur):
+    if valeur in ("", None):
+        return ""
+    if not isinstance(valeur, str):
+        return None
+    propre = valeur.strip()[:300]
+    if not propre:
+        return ""
+    if not propre.startswith("https://") or " " in propre:
+        return None
+    return propre
+
+
+def _tranche(qs, page):
+    total = qs.count()
+    pages = max(1, (total + _PAGE - 1) // _PAGE)
+    if page > pages:
+        page = pages
+    debut = (page - 1) * _PAGE
+    return list(qs[debut : debut + _PAGE]), total, page, pages
 
 
 def _compte_saisi(data):
@@ -196,16 +224,28 @@ def signalements(request):
     if type_filtre not in Signalement.Type.values:
         type_filtre = ""
     q = texte_propre(request.GET.get("q"))[:80]
-    qs = Signalement.objects.annotate(
-        appui_count=Count("appuis", distinct=True),
-        degage_count=Count("degages", distinct=True),
-    ).order_by("-cree_le")
+    qs = Signalement.objects.order_by("-cree_le")
     if type_filtre:
         qs = qs.filter(type=type_filtre)
     if q:
         qs = qs.filter(Q(lieu__icontains=q) | Q(commentaire__icontains=q))
+    page = _page_demandee(request)
+    total = qs.count()
+    pages = max(1, (total + _PAGE - 1) // _PAGE)
+    if page > pages:
+        page = pages
+    debut = (page - 1) * _PAGE
+    identifiants = list(qs.values_list("pk", flat=True)[debut : debut + _PAGE])
+    par_page = (
+        Signalement.objects.filter(pk__in=identifiants)
+        .annotate(
+            appui_count=Count("appuis", distinct=True),
+            degage_count=Count("degages", distinct=True),
+        )
+        .order_by("-cree_le")
+    )
     lignes = []
-    for item in qs[:150]:
+    for item in par_page:
         extrait = item.commentaire
         if len(extrait) > 140:
             extrait = extrait[:140].rstrip() + "…"
@@ -226,7 +266,10 @@ def signalements(request):
     return reponse(
         {
             "signalements": lignes,
-            "total": len(lignes),
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "taille": _PAGE,
             "types": [{"id": value, "label": label} for value, label in Signalement.Type.choices],
             "filtre": {"type": type_filtre, "q": q},
         }
@@ -271,10 +314,14 @@ def comptes(request):
         qs = qs.filter(confirme_le__isnull=True)
     if q:
         qs = qs.filter(Q(email__icontains=q) | Q(pseudo__icontains=q))
-    lignes = [_fiche(compte) for compte in qs[:200]]
+    extraits, total, page, pages = _tranche(qs, _page_demandee(request))
     return reponse(
         {
-            "comptes": lignes,
+            "comptes": [_fiche(compte) for compte in extraits],
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "taille": _PAGE,
             "admins": Compte.objects.filter(est_admin=True).count(),
             "abonnes": Compte.objects.filter(premium=True).count(),
             "attente": Compte.objects.filter(confirme_le__isnull=True).count(),
@@ -364,6 +411,15 @@ def reglages(request):
     if "inscriptions_ouvertes" in data:
         reglage.inscriptions_ouvertes = _drapeau(data.get("inscriptions_ouvertes"))
         suivi.append("inscriptions_ouvertes")
+    for cle in ("lien_android", "lien_apple"):
+        if cle not in data:
+            continue
+        lien = _lien_app(data.get(cle))
+        if lien is None:
+            champs[cle] = "Indiquez une adresse https, ou laissez vide."
+        else:
+            setattr(reglage, cle, lien)
+            suivi.append(cle)
     if champs:
         return erreur("Ces réglages ne sont pas valables.", champs=champs)
     if not reglage.routes_actives and reglage.fond_defaut == "routes":

@@ -4,13 +4,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#e7edf2">
+  <meta name="theme-color" content="#f6f7f8">
   <meta name="robots" content="noindex">
   <title>{% block title %}Administration — Wayizé{% endblock %}</title>
   <link rel="icon" href="{% static 'trafic/icons/favicon-32.png' %}" sizes="32x32" type="image/png">
-  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}?v=20261101h">
+  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}?v=20261101m">
 </head>
 <body class="wa">
+  <div class="wa-progress" aria-hidden="true"><span></span></div>
   <a class="wa-skip" href="#contenu">Aller au contenu</a>
   <div class="wa-scrim" data-nav-close hidden></div>
   <aside class="wa-sidebar" data-side>
@@ -90,6 +91,6 @@
       {% block content %}{% endblock %}
     </main>
   </div>
-  <script src="{% static 'trafic/js/admin.js' %}"></script>
+  <script src="{% static 'trafic/js/admin.js' %}?v=20261101m"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@
   <div>
     <p class="wa-kicker">Site</p>
     <h1>Paramètres</h1>
-    <p class="wa-lead">Inscriptions, fond de carte, prix Premium et règles des alertes. Enregistré, c’est appliqué tout de suite.</p>
+    <p class="wa-lead">Inscriptions, fond de carte, prix Premium, application et règles des alertes. Enregistré, c’est appliqué tout de suite.</p>
   </div>
 </header>
 
@@ -33,7 +33,7 @@
 
   <div class="wa-block">
     <h2>{% include "admin/icone.html" with name="map" %} Cartes</h2>
-    <p>Le plan routier est le fond topographique Esri : rues, relief et noms de Libreville. Le satellite reste les images Esri, avec le tracé des axes.</p>
+    <p>Le plan routier est le fond Esri des rues, avec un contraste renforcé pour les axes et les voies de quartier. Le satellite reste les images Esri, avec le tracé des axes.</p>
   </div>
   <div class="wa-set">
     <div>
@@ -110,6 +110,25 @@
       <input class="wa-num" id="plafond" name="plafond_heure" type="number" inputmode="numeric" min="1" max="24" required value="{{ reglages.plafond_heure }}">
       <span>par heure</span>
     </div>
+  </div>
+
+  <div class="wa-block">
+    <h2>{% include "admin/icone.html" with name="download" %} Application</h2>
+    <p>La carte propose d’elle-même l’installation dans le navigateur. Un lien Android ou Apple n’apparaît que s’il commence par https://. Laissez vide tant que le fichier n’est pas publié.</p>
+  </div>
+  <div class="wa-set wa-set-url">
+    <div>
+      <label for="lien_android">Lien Android</label>
+      <p class="wa-field-help">Adresse du fichier ou de la page qui le distribue.</p>
+    </div>
+    <input id="lien_android" name="lien_android" type="url" inputmode="url" maxlength="300" placeholder="https://" value="{{ reglages.lien_android }}">
+  </div>
+  <div class="wa-set wa-set-url">
+    <div>
+      <label for="lien_apple">Lien Apple</label>
+      <p class="wa-field-help">Adresse de l’application iPhone, si elle est publiée.</p>
+    </div>
+    <input id="lien_apple" name="lien_apple" type="url" inputmode="url" maxlength="300" placeholder="https://" value="{{ reglages.lien_apple }}">
   </div>
 
   <div class="wa-panel-foot">

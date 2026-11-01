@@ -53,4 +53,24 @@
       if (message && !window.confirm(message)) event.preventDefault();
     });
   });
+
+  function depart() {
+    body.classList.add("is-leaving");
+  }
+
+  document.addEventListener("click", function (event) {
+    const lien = event.target.closest("a[href]");
+    if (!lien || lien.target || lien.hasAttribute("download")) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    const url = new URL(lien.href, location.href);
+    if (url.origin !== location.origin || url.pathname === location.pathname && url.search === location.search) return;
+    depart();
+  });
+
+  document.addEventListener("submit", function (event) {
+    if (event.defaultPrevented) return;
+    const bouton = event.target.querySelector("[type=submit]");
+    if (bouton && !bouton.disabled) bouton.classList.add("is-loading");
+    depart();
+  });
 })();

@@ -26,6 +26,9 @@ class Signalement(models.Model):
         ordering = ["-cree_le"]
         verbose_name = "signalement"
         verbose_name_plural = "signalements"
+        indexes = [
+            models.Index(fields=["type", "cree_le"], name="signalement_type_cree"),
+        ]
         constraints = [
             models.CheckConstraint(
                 condition=Q(latitude__gte=SUD, latitude__lte=NORD)

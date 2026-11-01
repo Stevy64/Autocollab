@@ -129,6 +129,7 @@ def signalements(request):
 
 def lister(request):
     purger_expires()
+    # La carte publique reste bornée : l'admin pagine le reste.
     items = list(base_signalements()[:100])
     cle = cle_session(request)
     identifiants = [item.id for item in items]

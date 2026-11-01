@@ -61,7 +61,18 @@ def lire():
         "fond_defaut": fond,
         "routes_actives": routes,
         "inscriptions_ouvertes": bool(reglage.inscriptions_ouvertes),
+        "lien_android": _lien(reglage.lien_android),
+        "lien_apple": _lien(reglage.lien_apple),
     }
+
+
+def _lien(valeur):
+    if not isinstance(valeur, str):
+        return ""
+    propre = valeur.strip()[:300]
+    if propre.startswith("https://") and " " not in propre:
+        return propre
+    return ""
 
 
 def publics():
@@ -71,4 +82,6 @@ def publics():
         "prix_premium": lu["prix_premium"],
         "fond_defaut": lu["fond_defaut"],
         "routes_actives": lu["routes_actives"],
+        "lien_android": lu["lien_android"],
+        "lien_apple": lu["lien_apple"],
     }

@@ -159,8 +159,11 @@ class WebSliceTests(SimpleTestCase):
 
         script = (Path(__file__).resolve().parent / "static" / "trafic" / "js" / "app.js").read_text(encoding="utf-8")
         self.assertIn("World_Imagery/MapServer/tile/", script)
-        self.assertIn("World_Topo_Map/MapServer/tile/", script)
-        self.assertNotIn("World_Street_Map", script)
+        self.assertIn("World_Street_Map/MapServer/tile/", script)
+        self.assertIn("tuile-route", script)
+        self.assertNotIn("World_Topo_Map", script)
+        style = (Path(__file__).resolve().parent / "static" / "trafic" / "css" / "app.css").read_text(encoding="utf-8")
+        self.assertIn("contrast(1.25) saturate(2) brightness(0.82)", style)
         self.assertNotIn("tile.openstreetmap.org", script)
         self.assertNotIn("tile.openstreetmap.fr/osmfr/", script)
         self.assertIn("×${n}", script)

@@ -11,6 +11,8 @@ class Pilotage(models.Model):
     fond_defaut = models.CharField(max_length=16, default="satellite")
     routes_actives = models.BooleanField(default=True)
     inscriptions_ouvertes = models.BooleanField(default=True)
+    lien_android = models.CharField(max_length=300, blank=True, default="")
+    lien_apple = models.CharField(max_length=300, blank=True, default="")
 
     class Meta:
         verbose_name = "pilotage"

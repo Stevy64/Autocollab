@@ -320,3 +320,44 @@ class AdminConsoleTests(TestCase):
         self.assertEqual(abonnes.status_code, 200)
         self.assertEqual(abonnes.json()["comptes"], [])
         self.assertEqual(abonnes.json()["filtre"], "abonnes")
+        self.assertEqual(abonnes.json()["page"], 1)
+        self.assertGreaterEqual(abonnes.json()["pages"], 1)
+
+        self.assertEqual(avant.json()["lien_android"], "")
+        self.assertEqual(avant.json()["lien_apple"], "")
+        refuse = _post(
+            self.client,
+            "/api/admin/reglages/",
+            {
+                "duree_heures": 3,
+                "seuil_degage": 2,
+                "plafond_heure": 8,
+                "prix_premium": 2500,
+                "fond_defaut": "satellite",
+                "routes_actives": False,
+                "inscriptions_ouvertes": False,
+                "lien_android": "http://exemple.invalid/app.apk",
+            },
+            jeton,
+        )
+        self.assertEqual(refuse.status_code, 400)
+        publie = _post(
+            self.client,
+            "/api/admin/reglages/",
+            {
+                "duree_heures": 3,
+                "seuil_degage": 2,
+                "plafond_heure": 8,
+                "prix_premium": 2500,
+                "fond_defaut": "satellite",
+                "routes_actives": False,
+                "inscriptions_ouvertes": False,
+                "lien_android": "https://exemple.invalid/app.apk",
+                "lien_apple": "",
+            },
+            jeton,
+        )
+        self.assertEqual(publie.status_code, 200, publie.content)
+        self.assertEqual(publie.json()["lien_android"], "https://exemple.invalid/app.apk")
+        self.assertEqual(publie.json()["lien_apple"], "")
+        self.assertEqual(self.client.get("/api/carte/").json()["reglages"]["lien_android"], "https://exemple.invalid/app.apk")

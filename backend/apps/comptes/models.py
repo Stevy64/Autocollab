@@ -17,6 +17,11 @@ class Compte(models.Model):
 
     class Meta:
         verbose_name = "compte"
+        indexes = [
+            models.Index(fields=["premium", "cree_le"], name="compte_premium_cree"),
+            models.Index(fields=["est_admin", "cree_le"], name="compte_admin_cree"),
+            models.Index(fields=["confirme_le"], name="compte_confirme"),
+        ]
 
     def __str__(self):
         return str(self.pk)

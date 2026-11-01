@@ -123,7 +123,20 @@ def _reglages(data):
         "fond_defaut": fond,
         "routes_actives": data.get("routes_actives") is not False,
         "inscriptions_ouvertes": data.get("inscriptions_ouvertes") is not False,
+        "lien_android": _lien_lu(data.get("lien_android")),
+        "lien_apple": _lien_lu(data.get("lien_apple")),
     }
+
+
+def _lien_lu(valeur):
+    propre = str(valeur or "").strip()[:300]
+    if propre.startswith("https://") and " " not in propre:
+        return propre
+    return ""
+
+
+def _page_num(valeur):
+    return _entier(valeur, 1, 10000, 1)
 
 
 def _jours(lignes):
@@ -265,6 +278,9 @@ def signalements(request):
         params["type"] = type_filtre
     if q:
         params["q"] = q
+    page = _page_num(request.GET.get("page"))
+    if page > 1:
+        params["page"] = page
     chemin = "/api/admin/signalements/"
     if params:
         chemin += "?" + urlencode(params)
@@ -278,6 +294,7 @@ def signalements(request):
         ctx["lignes"] = []
         ctx["types"] = []
         ctx["filtre"] = {"type": type_filtre, "q": q}
+        ctx.update(_pagination(0, 1, 1, "/admin/signalements/", params))
         return _html(request, "admin/signalements.html", ctx)
     lignes = []
     for brute in data.get("signalements") or []:
@@ -295,7 +312,36 @@ def signalements(request):
             },
         }
     )
+    ctx["total"] = _entier(data.get("total"), 0, 10**9, len(lignes))
+    ctx.update(
+        _pagination(
+            ctx["total"],
+            _page_num(data.get("page") or page),
+            _page_num(data.get("pages") or 1),
+            "/admin/signalements/",
+            params,
+        )
+    )
     return _html(request, "admin/signalements.html", ctx)
+
+
+def _pagination(total, page, pages, base, params):
+    def lien(numero):
+        suite = dict(params)
+        suite.pop("page", None)
+        if numero > 1:
+            suite["page"] = numero
+        if not suite:
+            return base
+        return base + "?" + urlencode(suite)
+
+    return {
+        "total": total,
+        "page": page,
+        "pages": pages,
+        "precedent": lien(page - 1) if page > 1 else "",
+        "suivant": lien(page + 1) if page < pages else "",
+    }
 
 
 def _retour_liste(request):
@@ -306,6 +352,9 @@ def _retour_liste(request):
         params["type"] = type_filtre
     if q:
         params["q"] = q
+    page = _page_num(request.POST.get("page"))
+    if page > 1:
+        params["page"] = page
     if not params:
         return "/admin/signalements/"
     return "/admin/signalements/?" + urlencode(params)
@@ -346,12 +395,14 @@ def _ligne_compte(ligne):
     }
 
 
-def _lien_comptes(filtre, q):
+def _lien_comptes(filtre, q, page=1):
     params = {}
     if filtre in ("abonnes", "admins", "attente"):
         params["filtre"] = filtre
     if q:
         params["q"] = q
+    if page > 1:
+        params["page"] = page
     if not params:
         return "/admin/comptes/"
     return "/admin/comptes/?" + urlencode(params)
@@ -366,7 +417,8 @@ def comptes(request):
     if filtre not in ("abonnes", "admins", "attente"):
         filtre = ""
     q = " ".join((request.GET.get("q") or "").split())[:80]
-    chemin = _lien_comptes(filtre, q).replace("/admin/comptes/", "/api/admin/comptes/", 1)
+    page = _page_num(request.GET.get("page"))
+    chemin = _lien_comptes(filtre, q, page).replace("/admin/comptes/", "/api/admin/comptes/", 1)
     status, data = _api(request, chemin)
     bounce = _refuser(request, status, data)
     if bounce:
@@ -392,6 +444,7 @@ def comptes(request):
                 "liens": liens,
             }
         )
+        ctx.update(_pagination(0, 1, 1, "/admin/comptes/", {}))
         return _html(request, "admin/comptes.html", ctx)
     lignes = []
     for brute in data.get("comptes") or []:
@@ -407,7 +460,22 @@ def comptes(request):
             "filtre": str(data.get("filtre") or filtre)[:16],
             "q": str(data.get("q") or q)[:80],
             "liens": liens,
+            "total": _entier(data.get("total"), 0, 10**9, len(lignes)),
         }
+    )
+    params = {}
+    if filtre:
+        params["filtre"] = filtre
+    if q:
+        params["q"] = q
+    ctx.update(
+        _pagination(
+            ctx["total"],
+            _page_num(data.get("page") or page),
+            _page_num(data.get("pages") or 1),
+            "/admin/comptes/",
+            params,
+        )
     )
     return _html(request, "admin/comptes.html", ctx)
 
@@ -435,7 +503,7 @@ def compte(request, pk):
         _flash(request, data.get("message") or "Le compte n'a pas pu être modifié.", erreur=True)
     filtre = (request.POST.get("filtre") or "").strip()
     q = " ".join((request.POST.get("q") or "").split())[:80]
-    return redirect(_lien_comptes(filtre, q))
+    return redirect(_lien_comptes(filtre, q, _page_num(request.POST.get("page"))))
 
 
 @ensure_csrf_cookie
@@ -456,14 +524,23 @@ def reglages(request):
             "fond_defaut": fond or "satellite",
             "routes_actives": request.POST.get("routes_actives") == "1",
             "inscriptions_ouvertes": request.POST.get("inscriptions_ouvertes") == "1",
+            "lien_android": (request.POST.get("lien_android") or "").strip()[:300],
+            "lien_apple": (request.POST.get("lien_apple") or "").strip()[:300],
         }
+        liens_ok = all(
+            not saisi[cle] or _lien_lu(saisi[cle]) for cle in ("lien_android", "lien_apple")
+        )
         duree = _borne_saisie(saisi["duree_heures"], 1, 12)
         seuil = _borne_saisie(saisi["seuil_degage"], 2, 5)
         plafond = _borne_saisie(saisi["plafond_heure"], 1, 24)
         prix = _borne_saisie(saisi["prix_premium"], 0, 100000)
-        if None in (duree, seuil, plafond, prix) or fond not in ("satellite", "routes"):
+        if None in (duree, seuil, plafond, prix) or fond not in ("satellite", "routes") or not liens_ok:
             ctx = _coquille(request, "reglages")
-            ctx["erreur"] = "Vérifiez les bornes : durée 1–12 h, votes « dégagé » 2–5, plafond 1–24, prix 0–100 000 F."
+            ctx["erreur"] = (
+                "Les liens Android et Apple doivent commencer par https://, ou rester vides."
+                if not liens_ok
+                else "Vérifiez les bornes : durée 1–12 h, votes « dégagé » 2–5, plafond 1–24, prix 0–100 000 F."
+            )
             ctx["reglages"] = saisi
             return _html(request, "admin/reglages.html", ctx)
         status, data = _api(
@@ -478,6 +555,8 @@ def reglages(request):
                 "fond_defaut": fond,
                 "routes_actives": saisi["routes_actives"],
                 "inscriptions_ouvertes": saisi["inscriptions_ouvertes"],
+                "lien_android": _lien_lu(saisi["lien_android"]),
+                "lien_apple": _lien_lu(saisi["lien_apple"]),
             },
         )
         bounce = _refuser(request, status, data)

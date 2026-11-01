@@ -51,6 +51,7 @@
         {% csrf_token %}
         {% if filtre %}<input type="hidden" name="filtre" value="{{ filtre }}">{% endif %}
         {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+        {% if page > 1 %}<input type="hidden" name="page" value="{{ page }}">{% endif %}
         <label class="wa-switch is-premium">
           <input type="checkbox" name="premium" value="1"{% if ligne.premium %} checked{% endif %}>
           <span class="wa-switch-ui">
@@ -83,6 +84,13 @@
     <h2>{% if filtre == "abonnes" %}Aucun abonné{% elif filtre == "attente" %}Aucune confirmation en attente{% elif q %}Aucun résultat{% else %}Aucun usager{% endif %}</h2>
     <p>{% if filtre == "abonnes" %}Le droit Premium se donne depuis la liste des usagers, ou depuis la carte.{% else %}Les comptes se créent depuis la carte.{% endif %}</p>
   </div>
+  {% endif %}
+  {% if pages > 1 %}
+  <nav class="wa-pager" aria-label="Pages des usagers">
+    {% if precedent %}<a class="wa-btn wa-btn-quiet" href="{{ precedent }}">Précédent</a>{% else %}<span></span>{% endif %}
+    <span>Page {{ page }} sur {{ pages }}</span>
+    {% if suivant %}<a class="wa-btn wa-btn-quiet" href="{{ suivant }}">Suivant</a>{% else %}<span></span>{% endif %}
+  </nav>
   {% endif %}
 </section>
 {% endblock %}

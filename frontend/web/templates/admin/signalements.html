@@ -6,7 +6,7 @@
     <p class="wa-kicker">Carte</p>
     <h1>Alertes</h1>
     {% if lignes %}
-    <p class="wa-lead">{{ total }} en cours. Retirer un signalement le supprime pour tout le monde.</p>
+    <p class="wa-lead">{{ total }} en cours, les plus récentes d'abord. Retirer un signalement le supprime pour tout le monde.</p>
     {% endif %}
   </div>
 </header>
@@ -41,6 +41,7 @@
           {% csrf_token %}
           <input type="hidden" name="type" value="{{ filtre.type }}">
           <input type="hidden" name="q" value="{{ filtre.q }}">
+          {% if page > 1 %}<input type="hidden" name="page" value="{{ page }}">{% endif %}
           <button class="wa-btn wa-btn-danger" type="submit">{% include "admin/icone.html" with name="trash" %} Retirer</button>
         </form>
       </div>
@@ -58,6 +59,13 @@
       <p>Les alertes expirées quittent déjà la base. Un signalement encore visible sur la carte apparaît ici.</p>
     </div>
   </div>
+  {% endif %}
+  {% if pages > 1 %}
+  <nav class="wa-pager" aria-label="Pages des alertes">
+    {% if precedent %}<a class="wa-btn wa-btn-quiet" href="{{ precedent }}">Précédent</a>{% else %}<span></span>{% endif %}
+    <span>Page {{ page }} sur {{ pages }}</span>
+    {% if suivant %}<a class="wa-btn wa-btn-quiet" href="{{ suivant }}">Suivant</a>{% else %}<span></span>{% endif %}
+  </nav>
   {% endif %}
 </section>
 {% endblock %}

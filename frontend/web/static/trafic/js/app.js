@@ -116,7 +116,7 @@ const FAQ = [
   {
     id: "install",
     q: "Comment installer Wayizé ?",
-    a: "Dans le menu du navigateur, choisissez Ajouter à l'écran d'accueil. L'application s'ouvre ensuite comme une app, sans passer par une boutique.",
+    a: "À l'ouverture, Wayizé propose de s'installer. Le bouton Installer ajoute l'application quand le navigateur le permet. Sur iPhone : Partager, puis Sur l'écran d'accueil. Un lien Android ou Apple n'apparaît que s'il a été publié dans les paramètres.",
   },
   {
     id: "retrait",
@@ -705,13 +705,13 @@ function appliquerFond(id) {
   if (!map) return;
   if (choisi === "routes") {
     if (map.hasLayer(fondSatellite)) map.removeLayer(fondSatellite);
-    if (map.hasLayer(fondAxes)) map.removeLayer(fondAxes);
     if (!map.hasLayer(fondRoutes)) fondRoutes.addTo(map);
   } else {
     if (map.hasLayer(fondRoutes)) map.removeLayer(fondRoutes);
     if (!map.hasLayer(fondSatellite)) fondSatellite.addTo(map);
-    if (!map.hasLayer(fondAxes)) fondAxes.addTo(map);
   }
+  if (!map.hasLayer(fondAxes)) fondAxes.addTo(map);
+  fondAxes.bringToFront();
   document.querySelectorAll("[data-fond]").forEach((bouton) => {
     bouton.setAttribute("aria-pressed", bouton.dataset.fond === choisi ? "true" : "false");
   });
@@ -730,9 +730,9 @@ function initMap() {
   map.setMaxBounds(bounds.pad(0.2));
   map.setView([boot.centre.latitude, boot.centre.longitude], homeZoom());
 
-  // Satellite Esri, et plan World Topo : rues, relief et noms de Libreville,
-  // sans clé payante. Le trafic en direct des cartes commerciales demande
-  // une clé que ce serveur n'a pas.
+  // Satellite Esri, et plan des rues Esri. Le contraste est renforcé en CSS
+  // pour que les axes et les voies de quartier se lisent. Le trafic en direct
+  // des cartes commerciales demande une clé que ce serveur n'a pas.
   fondSatellite = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     {
@@ -746,12 +746,13 @@ function initMap() {
     { maxZoom: 19, maxNativeZoom: 18, attribution: "" },
   );
   fondRoutes = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
     {
+      className: "tuile-route",
       maxZoom: 19,
-      maxNativeZoom: 19,
+      maxNativeZoom: 18,
       attribution:
-        'Routes © <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, USGS, OSM',
+        'Routes © <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, OSM',
     },
   );
   surveillerTuiles(fondSatellite);
@@ -3230,6 +3231,63 @@ function lireLienCompte() {
   state.mode = "compte";
 }
 
+let inviteInstall = null;
+
+function lienApp(cle) {
+  const valeur = String(reglagesCarte()[cle] || "").trim();
+  return valeur.startsWith("https://") && !valeur.includes(" ") ? valeur : "";
+}
+
+function dejaInstallee() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function proposerInstall() {
+  if (dejaInstallee() || document.getElementById("install-banner")) return;
+  let reporte = 0;
+  try { reporte = Number(localStorage.getItem("wayize.install.reporte") || 0); } catch (error) { reporte = 0; }
+  if (reporte && Date.now() - reporte < 3 * 24 * 60 * 60 * 1000) return;
+  const android = lienApp("lien_android");
+  const apple = lienApp("lien_apple");
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const precision = ios && !inviteInstall
+    ? "Sur iPhone : Partager, puis Sur l'écran d'accueil."
+    : "Elle s'ouvre ensuite comme une application, sans boutique.";
+  const natif = [
+    android ? `<a href="${esc(android)}" target="_blank" rel="noopener noreferrer">Android</a>` : "",
+    apple ? `<a href="${esc(apple)}" target="_blank" rel="noopener noreferrer">Apple</a>` : "",
+  ].join("");
+  const bandeau = document.createElement("aside");
+  bandeau.id = "install-banner";
+  bandeau.className = "install-banner";
+  bandeau.innerHTML = `<strong>Installer Wayizé</strong><p>${precision}</p><div class="install-actions"><button type="button" data-install ${inviteInstall ? "" : "hidden"}>Installer</button>${natif}<button type="button" class="is-quiet" data-plus-tard>Plus tard</button></div>`;
+  document.body.appendChild(bandeau);
+  const bouton = bandeau.querySelector("[data-install]");
+  bouton.addEventListener("click", async () => {
+    if (!inviteInstall) return;
+    bouton.classList.add("is-busy");
+    try {
+      await inviteInstall.prompt();
+      inviteInstall = null;
+      bouton.hidden = true;
+    } catch (error) {
+      bouton.classList.remove("is-busy");
+    }
+  });
+  bandeau.querySelector("[data-plus-tard]").addEventListener("click", () => {
+    try { localStorage.setItem("wayize.install.reporte", String(Date.now())); } catch (error) { /* le bandeau revient à la prochaine visite */ }
+    bandeau.remove();
+  });
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  inviteInstall = event;
+  const bouton = document.querySelector("#install-banner [data-install]");
+  if (bouton) bouton.hidden = false;
+  else if (boot) proposerInstall();
+});
+
 function start() {
   boot = JSON.parse(document.getElementById("boot-data").textContent);
   restaurerMemoire();
@@ -3244,6 +3302,7 @@ function start() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
+  proposerInstall();
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);

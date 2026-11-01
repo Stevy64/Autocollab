@@ -1161,8 +1161,8 @@ body.is-compose .sheet-content {
   pointer-events: none;
 }
 .lieu-nom span.is-pres { font-size: 13px; }
-body.is-routes .leaflet-tile-pane img {
-  filter: contrast(1.18) saturate(0.92);
+.tuile-route {
+  filter: contrast(1.25) saturate(2) brightness(0.82);
 }
 body.is-routes .lieu-nom span {
   color: #1c1917;
@@ -1804,6 +1804,67 @@ body.is-driving .veille p { font-size: 18px; }
   }
   .legal { align-items: center; padding: 24px; }
   .legal-panel { border-radius: 28px; max-height: min(80dvh, 720px); }
+}
+
+.install-banner {
+  position: fixed;
+  z-index: 11;
+  top: calc(68px + env(safe-area-inset-top));
+  left: 12px;
+  right: 168px;
+  width: auto;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-float);
+  animation: rise 240ms ease;
+}
+.install-banner strong { font-size: 15px; letter-spacing: -0.02em; }
+.install-banner p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.install-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.install-actions a,
+.install-actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.install-actions .is-quiet { background: var(--soft); color: var(--ink); }
+.install-actions button.is-busy { color: transparent; position: relative; }
+.install-actions button.is-busy::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: install-spin 0.7s linear infinite;
+}
+@keyframes install-spin { to { transform: rotate(360deg); } }
+
+@media (min-width: 960px) {
+  .install-banner {
+    left: calc(var(--panel) + 28px);
+    right: auto;
+    width: 340px;
+    top: 84px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

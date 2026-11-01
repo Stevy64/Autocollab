@@ -4,11 +4,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#e7edf2">
+  <meta name="theme-color" content="#f6f7f8">
   <meta name="robots" content="noindex">
   <title>Connexion — Administration Wayizé</title>
   <link rel="icon" href="{% static 'trafic/icons/favicon-32.png' %}" sizes="32x32" type="image/png">
-  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}?v=20261101h">
+  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}?v=20261101m">
 </head>
 <body class="wa wa-auth">
   <main class="wa-login">
@@ -19,9 +19,8 @@
       <span>Wayizé</span>
     </a>
     <section class="wa-card wa-login-card">
-      <p class="wa-kicker">Administration</p>
-      <h1>Entrer dans la console</h1>
-      <p class="wa-lead">Pilotage du site : alertes, usagers, abonnés et paramètres. Rien ici ne suit un trajet.</p>
+      <h1>Connexion</h1>
+      <p class="wa-lead">Alertes, usagers et paramètres du site.</p>
       {% if flash %}
       <div class="wa-flash{% if flash.erreur %} is-error{% endif %}" role="status">{{ flash.texte }}</div>
       {% endif %}
@@ -40,10 +39,10 @@
           <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="lock" %}</span>
           <input id="mot" name="mot_de_passe" type="password" autocomplete="current-password" required minlength="4" maxlength="72" placeholder="Mot de passe">
         </div>
-        <button class="wa-btn wa-btn-dark wa-btn-block" type="submit">{% include "admin/icone.html" with name="enter" %} Entrer</button>
+        <button class="wa-btn wa-btn-dark wa-btn-block" type="submit">Entrer</button>
       </form>
-      <p class="wa-note">S’il n’y a encore aucun administrateur, le premier compte Wayizé qui se connecte ici le devient. Ensuite, seuls les administrateurs entrent. Le compte se crée sur la carte, ou avec un identifiant court.</p>
-      <a class="wa-text-link" href="/">{% include "admin/icone.html" with name="map" %} Retour à la carte</a>
+      <p class="wa-note">Le premier compte qui entre ici devient administrateur. Ensuite, seuls les comptes qui ont ce droit peuvent ouvrir la console.</p>
+      <a class="wa-text-link" href="/">Retour à la carte</a>
     </section>
   </main>
 </body>
