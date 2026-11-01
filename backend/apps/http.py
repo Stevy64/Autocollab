@@ -70,8 +70,8 @@ def nombre(valeur):
     return n
 
 
-def lire_json(request):
-    if len(request.body) > TAILLE_MAX_REQUETE:
+def lire_json(request, taille=TAILLE_MAX_REQUETE):
+    if len(request.body) > taille:
         return None, "Le message est trop volumineux."
     if not request.body:
         return {}, None

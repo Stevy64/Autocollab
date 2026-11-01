@@ -86,7 +86,7 @@ const FAQ = [
   {
     id: "vite",
     q: "Comment signaler vite ?",
-    a: "Touchez Signaler, choisissez le type, puis le quartier. Une phrase est déjà proposée : vous pouvez la garder ou en prendre une autre. Trois gestes suffisent. Si le lieu n'est pas dans la liste, touchez la carte.",
+    a: "Touchez Signaler, choisissez le type, puis le quartier. Un commentaire est déjà proposé : vous pouvez le garder ou en prendre un autre. Trois gestes suffisent. Si le lieu n'est pas dans la liste, touchez la carte.",
   },
   {
     id: "duree",
@@ -211,6 +211,8 @@ const state = {
   loaded: false,
   error: null,
   picking: false,
+  deplacerId: null,
+  deplacementEnCours: false,
   saving: false,
   commentSending: false,
   commentError: "",
@@ -309,6 +311,8 @@ const UI = {
   eye: '<path d="M2.5 12S6.2 6.2 12 6.2 21.5 12 21.5 12 17.8 17.8 12 17.8 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7"/>',
   eyeOff: '<path d="M3.2 3.2 20.8 20.8M9.4 6.5A9 9 0 0 1 12 6.2c5.8 0 9.5 5.8 9.5 5.8a16 16 0 0 1-3.1 3.6M6.2 7.4C4 8.9 2.5 12 2.5 12s3.7 5.8 9.5 5.8c1.1 0 2.1-.2 3-.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10 10.2a2.6 2.6 0 0 0 3.6 3.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
   car: '<path d="M4 14.5h16M6.2 14.2 7.6 9.2A1.4 1.4 0 0 1 9 8.2h6a1.4 1.4 0 0 1 1.4 1l1.4 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="8" cy="16.2" r="1.2" fill="currentColor"/><circle cx="16" cy="16.2" r="1.2" fill="currentColor"/>',
+  sheetDown: '<path d="M4.5 15.2h15a1.4 1.4 0 0 1 1.4 1.4v2.4a1.4 1.4 0 0 1-1.4 1.4h-15a1.4 1.4 0 0 1-1.4-1.4v-2.4a1.4 1.4 0 0 1 1.4-1.4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 8.2 12 12l3.8-3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  sheetUp: '<path d="M4.5 15.2h15a1.4 1.4 0 0 1 1.4 1.4v2.4a1.4 1.4 0 0 1-1.4 1.4h-15a1.4 1.4 0 0 1-1.4-1.4v-2.4a1.4 1.4 0 0 1 1.4-1.4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 12 12 8.2 15.8 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 
 function uiIcon(name, size = 16) {
@@ -478,6 +482,15 @@ function setVisible(px) {
   const top = document.querySelector(".topbar");
   const needed = top ? Math.ceil(top.getBoundingClientRect().bottom) + 64 : 180;
   document.body.classList.toggle("sheet-covers", !isDesktop() && window.innerHeight - next < needed);
+  peindrePoignee(next);
+}
+
+function peindrePoignee(px) {
+  const grabber = document.getElementById("grabber");
+  if (!grabber) return;
+  const haute = px >= sheetCeiling() - 28;
+  grabber.classList.toggle("is-haute", haute);
+  grabber.setAttribute("aria-label", haute ? "Baisser la liste" : "Déployer la liste");
 }
 
 function snapPoints() {
@@ -498,6 +511,31 @@ function snapTo(px) {
     }
   }
   setVisible(best);
+}
+
+function feuilleCachee() {
+  return document.body.classList.contains("is-sheet-hidden");
+}
+
+function peindreBascule() {
+  const bouton = document.getElementById("sheet-toggle");
+  if (!bouton) return;
+  const cachee = feuilleCachee();
+  bouton.setAttribute("aria-pressed", cachee ? "false" : "true");
+  bouton.setAttribute("aria-label", cachee ? "Afficher les signalements" : "Masquer les signalements");
+  bouton.innerHTML = uiIcon(cachee ? "sheetUp" : "sheetDown", 20);
+}
+
+function revelerFeuille() {
+  if (!feuilleCachee()) return;
+  document.body.classList.remove("is-sheet-hidden");
+  peindreBascule();
+}
+
+function basculerFeuille() {
+  document.body.classList.toggle("is-sheet-hidden");
+  peindreBascule();
+  if (map) window.setTimeout(() => map.invalidateSize(), 240);
 }
 
 function cycleSheet() {
@@ -773,6 +811,10 @@ function initMap() {
   pickLayer = L.layerGroup().addTo(map);
   map.on("click", (event) => {
     if (!state.picking) return;
+    if (state.deplacerId) {
+      envoyerDeplacement(event.latlng);
+      return;
+    }
     setPickedPoint(event.latlng);
   });
   map.on("zoomend moveend", () => {
@@ -1097,6 +1139,15 @@ function emptyHtml() {
   return `<div class="state"><h2>La route est calme</h2><p>Aucun signalement à Libreville pour l'instant. Si une situation peut créer un bouchon, signalez-la.</p><button type="button" class="btn btn-primary" data-action="compose">${uiIcon("alarm")} Signaler un incident</button></div>`;
 }
 
+function boutonCompte() {
+  const premium = Boolean(state.compte && state.compte.premium);
+  return `<button type="button" class="btn btn-ghost btn-compact" data-action="compte">${uiIcon(premium ? "star" : "user")} ${premium ? "Premium" : "Compte"}</button>`;
+}
+
+function boutonSignaler() {
+  return `<button type="button" class="btn btn-primary btn-compact btn-signaler" data-action="compose">${uiIcon("alarm")} Signaler</button>`;
+}
+
 function renderFeed() {
   const items = visibleReports();
   const liste = listeActive();
@@ -1104,14 +1155,14 @@ function renderFeed() {
   const subtitle = suivi
     ? ""
     : (state.reports.length ? `Dernier signalement ${state.reports[0].relatif}` : "Libreville");
-  const compteLabel = state.compte && state.compte.premium ? "Premium" : "Compte";
   return `
+    <div class="feed">
     <div class="feed-bar">
       <div class="sheet-head">
         <h1>En ce moment</h1>
         <div class="sheet-actions">
-          <button type="button" class="btn btn-ghost btn-compact" data-action="compte">${compteLabel}</button>
-          <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
+          ${boutonCompte()}
+          ${boutonSignaler()}
         </div>
         ${subtitle ? `<p>${esc(subtitle)}</p>` : ""}
         ${bandeauSuivi(suivi)}
@@ -1127,6 +1178,7 @@ function renderFeed() {
     <div class="legal-links">
       <button type="button" class="btn btn-ghost" data-action="cgu">CGU</button>
       <button type="button" class="btn btn-ghost" data-action="faq">FAQ</button>
+    </div>
     </div>`;
 }
 
@@ -1169,8 +1221,8 @@ function renderDetail() {
   const degageHint = phraseDegage(report);
   return `
     <div class="sheet-head">
-      <button type="button" class="btn btn-ghost btn-compact" data-action="back">Retour</button>
-      <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("back")} Retour</button>
+      ${boutonSignaler()}
     </div>
     <article class="detail">
       <div class="detail-kicker">
@@ -1178,6 +1230,7 @@ function renderDetail() {
         <span class="muted">${esc(report.relatif)}</span>
       </div>
       <h2>${esc(report.lieu)}</h2>
+      ${report.mien ? `<button type="button" class="btn-text pick-link" data-action="deplacer" data-id="${report.id}">${uiIcon("pin")} Déplacer le point</button>` : ""}
       <p class="detail-text">${esc(report.commentaire)}</p>
       <div class="verdict">
         <button type="button" class="appui${report.appuye ? " is-on" : ""}" data-action="appui" data-id="${report.id}" aria-pressed="${report.appuye ? "true" : "false"}" aria-label="${report.appuye ? "Confirmé" : "Confirmer"} ×${report.appuis}">
@@ -1220,11 +1273,12 @@ function etapesSignalement() {
   const typeOk = Boolean(state.draft.type);
   const lieuOk = (state.draft.lieu || "").trim().length >= 2 && state.draft.latitude != null;
   const texteOk = (state.draft.commentaire || "").trim().length >= 8;
-  return [
+  const etapes = [
     { id: "type", label: "Type", fait: typeOk },
     { id: "lieu", label: "Lieu", fait: lieuOk },
-    { id: "phrase", label: "Phrase", fait: texteOk },
   ];
+  if (lieuOk) etapes.push({ id: "commentaire", label: "Commentaire", court: "Com", fait: texteOk });
+  return etapes;
 }
 
 function consigneSignalement() {
@@ -1237,7 +1291,7 @@ function consigneSignalement() {
     if ((state.draft.lieu || "").trim()) return "Choisissez un quartier, ou ajoutez-le";
     return "Indiquez le quartier";
   }
-  if (erreurs.commentaire) return "Gardez la phrase, ou écrivez la vôtre";
+  if (erreurs.commentaire) return "Gardez le commentaire, ou écrivez le vôtre";
   if ((state.draft.lieu || "").trim() && !state.draft.lieuId) return "Ce quartier sera ajouté à la liste";
   return "Prêt";
 }
@@ -1299,10 +1353,11 @@ function renderCompose() {
   const courant = etapes.find((etape) => !etape.fait);
   const pret = !courant;
   const phrases = phrasesDuType();
+  const lieuOk = (state.draft.lieu || "").trim().length >= 2 && state.draft.latitude != null;
   const place = state.draft.latitude != null
     ? `<button type="button" class="btn-text pick-link" data-action="pick">Déplacer le point</button>`
     : `<button type="button" class="btn btn-ghost btn-block pick-btn${(state.draft.lieu || "").trim() ? " is-needed" : ""}" data-action="pick">Placer sur la carte</button>`;
-  const suite = state.draft.type ? `
+  const lieuBloc = state.draft.type ? `
       <label class="field-label" for="lieu-saisie">Quartier</label>
       <div class="lieu-cherche" id="lieu-cherche">
         <input id="lieu-saisie" class="field${state.errors.lieu ? " is-invalid" : ""}" maxlength="120" autocomplete="off" enterkeyhint="search" placeholder="Rechercher ou ajouter un quartier" value="${esc(state.draft.lieu)}" role="combobox" aria-autocomplete="list" aria-controls="lieux-connus" aria-expanded="${state.lieuOuvert ? "true" : "false"}">
@@ -1310,12 +1365,13 @@ function renderCompose() {
       </div>
       <p class="chosen${state.draft.latitude != null ? " is-set" : ""}"${lieuAide() ? "" : " hidden"}>${esc(lieuAide())}</p>
       ${state.errors.lieu ? `<p class="field-error" id="lieu-erreur">${esc(state.errors.lieu)}</p>` : ""}
-      ${place}
-      <p class="field-label">Phrase</p>
-      <div class="phrase-row" role="group" aria-label="Phrases rapides">
+      ${place}` : "";
+  const commentaireBloc = lieuOk ? `
+      <p class="field-label">Commentaire</p>
+      <div class="phrase-row" role="group" aria-label="Commentaires rapides">
         ${phrases.map((phrase, index) => `<button type="button" class="phrase" data-action="phrase" data-index="${index}" aria-pressed="${text.trim() === phrase ? "true" : "false"}">${esc(phrase)}</button>`).join("")}
       </div>
-      <label class="sr-only" for="commentaire">Modifier la phrase</label>
+      <label class="sr-only" for="commentaire">Modifier le commentaire</label>
       <textarea id="commentaire" class="field${state.errors.commentaire ? " is-invalid" : ""}" maxlength="280" rows="2" placeholder="Ou écrivez ce que vous voyez.">${esc(text)}</textarea>
       <div class="field-meta">
         <span>${state.errors.commentaire ? `<span class="field-error">${esc(state.errors.commentaire)}</span>` : "Pas de nom, pas de numéro."}</span>
@@ -1326,17 +1382,24 @@ function renderCompose() {
     <div class="sheet-head">
       <div>
         <h1>Signaler</h1>
-        <p>Un type, un lieu, une phrase.</p>
+        <p>Un type, un lieu, un commentaire.</p>
       </div>
       <button type="button" class="btn btn-ghost btn-compact" data-action="back">Fermer</button>
     </div>
     <form id="compose-form" class="compose" novalidate>
       <ol class="compose-steps" aria-label="Étapes">
-        ${etapes.map((etape) => `<li class="${etape.fait ? "is-done" : courant && courant.id === etape.id ? "is-current" : ""}">${esc(etape.label)}</li>`).join("")}
+        ${etapes.map((etape) => {
+          const classe = etape.fait ? "is-done" : courant && courant.id === etape.id ? "is-current" : "";
+          const libelle = etape.court
+            ? `<span class="step-long">${esc(etape.label)}</span><span class="step-short">${esc(etape.court)}</span>`
+            : esc(etape.label);
+          return `<li class="${classe}">${libelle}</li>`;
+        }).join("")}
       </ol>
       ${htmlTypes()}
       ${state.errors.type ? `<p class="field-error">${esc(state.errors.type)}</p>` : ""}
-      ${suite}
+      ${lieuBloc}
+      ${commentaireBloc}
     </form>
     </div>
     <div class="compose-dock">
@@ -1979,11 +2042,20 @@ function render() {
   document.body.classList.toggle("is-account", state.mode === "compte");
   document.body.classList.toggle("is-driving", !!(state.compte && state.compte.premium && assurerReglages().conduite));
   const banner = document.getElementById("pick-banner");
-  if (banner) banner.hidden = !state.picking;
+  if (banner) {
+    banner.hidden = !state.picking;
+    const texte = banner.querySelector("p");
+    if (texte) {
+      texte.textContent = state.deplacerId
+        ? "Touchez la carte pour déplacer votre point"
+        : "Touchez la carte pour placer le quartier";
+    }
+  }
   if (state.searchOpen) renderSearchResults();
 }
 
 function showCompose() {
+  revelerFeuille();
   state.returnMode = state.mode === "detail" ? "detail" : "feed";
   state.mode = "compose";
   state.picking = false;
@@ -2015,6 +2087,7 @@ function goBack() {
 function selectReport(id) {
   const report = state.reports.find((item) => item.id === id);
   if (!report) return;
+  revelerFeuille();
   state.selectedId = id;
   state.mode = "detail";
   state.returnMode = "feed";
@@ -2140,8 +2213,54 @@ function afficherAideLieu() {
 }
 
 function startPick() {
+  state.deplacerId = null;
   state.picking = true;
   if (!isDesktop()) setVisible(snapPoints()[0]);
+  render();
+}
+
+function commencerDeplacement(id) {
+  const report = state.reports.find((item) => item.id === id && item.mien);
+  if (!report) return;
+  state.deplacerId = id;
+  state.picking = true;
+  if (!isDesktop()) setVisible(snapPoints()[0]);
+  render();
+  if (map) map.flyTo([report.latitude, report.longitude], Math.max(map.getZoom(), 16), { duration: motion() });
+}
+
+async function envoyerDeplacement(latlng) {
+  if (state.deplacementEnCours || !state.deplacerId) return;
+  if (!inside(latlng.lat, latlng.lng)) {
+    toast("Ce point est en dehors du Grand Libreville.");
+    return;
+  }
+  const id = state.deplacerId;
+  state.deplacementEnCours = true;
+  try {
+    const data = await api(`/api/signalements/${id}/position/`, {
+      method: "POST",
+      body: JSON.stringify({ latitude: latlng.lat, longitude: latlng.lng }),
+    });
+    upsert(data.signalement);
+    state.picking = false;
+    state.deplacerId = null;
+    revelerFeuille();
+    if (!isDesktop()) setVisible(snapPoints()[1]);
+    toast("Point déplacé.");
+    render();
+    if (map) map.flyTo([latlng.lat, latlng.lng], Math.max(map.getZoom(), 16), { duration: motion() });
+  } catch (error) {
+    toast(messageFrom(error, "Le point n'a pas pu être déplacé."));
+  } finally {
+    state.deplacementEnCours = false;
+  }
+}
+
+function annulerPick() {
+  state.picking = false;
+  state.deplacerId = null;
+  if (!isDesktop()) setVisible(snapPoints()[state.mode === "detail" ? 1 : 2]);
   render();
 }
 
@@ -2955,6 +3074,7 @@ function onSheetClick(event) {
   else if (action === "cgu") ouvrirLegal("cgu");
   else if (action === "faq") ouvrirLegal("faq");
   else if (action === "pick") startPick();
+  else if (action === "deplacer") commencerDeplacement(Number(el.dataset.id));
   else if (action === "appui") support(Number(el.dataset.id));
   else if (action === "degage") degager(Number(el.dataset.id));
   else if (action === "retry") reload();
@@ -3061,6 +3181,13 @@ function onInput(event) {
   if (event.target.id === "detail-commentaire") state.detailDraft = event.target.value;
   if (event.target.id === "lieu-saisie") {
     const connu = appliquerLieuSaisi(event.target.value);
+    const lieuOk = (state.draft.lieu || "").trim().length >= 2 && state.draft.latitude != null;
+    if (lieuOk && !document.getElementById("commentaire")) {
+      render();
+      const champ = document.getElementById("lieu-saisie");
+      if (champ) champ.focus();
+      return;
+    }
     state.lieuOuvert = !connu;
     afficherAideLieu();
     peindreLieux();
@@ -3139,8 +3266,11 @@ function bind() {
     state.faqOuverte = state.faqOuverte === id ? "" : id;
     peindreLegal(`[data-faq="${CSS.escape(id)}"]`);
   });
-  document.getElementById("recenter").addEventListener("click", () => {
+  document.getElementById("brand-home").addEventListener("click", () => {
     clearPlace();
+  });
+  document.getElementById("sheet-toggle").addEventListener("click", () => {
+    basculerFeuille();
   });
   document.querySelector(".fonds").addEventListener("click", (event) => {
     const bouton = event.target.closest("[data-fond]");
@@ -3190,9 +3320,7 @@ function bind() {
     selectReport(Number(hit.dataset.id));
   });
   document.getElementById("pick-cancel").addEventListener("click", () => {
-    state.picking = false;
-    if (!isDesktop()) setVisible(snapPoints()[2]);
-    render();
+    annulerPick();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
@@ -3210,9 +3338,7 @@ function bind() {
       return;
     }
     if (state.picking) {
-      state.picking = false;
-      if (!isDesktop()) setVisible(snapPoints()[2]);
-      render();
+      annulerPick();
       return;
     }
     if (state.mode !== "feed") goBack();

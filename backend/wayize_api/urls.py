@@ -1,9 +1,12 @@
 from django.urls import include, path
 
+from apps.pilotage.views import logo
+
 from . import views
 
 urlpatterns = [
     path("api/sante/", views.sante, name="sante"),
+    path("api/logo/", logo, name="logo"),
     path("api/signalements/", include("apps.signalements.urls")),
     path("api/signalements/", include("apps.appuis.urls")),
     path("api/signalements/", include("apps.commentaires.urls")),

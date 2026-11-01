@@ -5,8 +5,9 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.db.models import Count, Q
+from django.http import HttpResponse
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.appuis.models import Appui, Degage
 from apps.comptes.models import Compte
@@ -27,7 +28,9 @@ from .reglages import (
     PRIX_MIN,
     SEUIL_MAX,
     SEUIL_MIN,
+    _type_image,
     courant,
+    decoder_logo,
     lire,
 )
 
@@ -376,7 +379,7 @@ def reglages(request):
         return refus
     if request.method == "GET":
         return reponse(lire())
-    data, message = lire_json(request)
+    data, message = lire_json(request, taille=1_200_000)
     if message:
         return erreur(message)
     duree = _entier(data.get("duree_heures"), DUREE_MIN, DUREE_MAX)
@@ -420,6 +423,18 @@ def reglages(request):
         else:
             setattr(reglage, cle, lien)
             suivi.append(cle)
+    if "logo" in data:
+        logo = decoder_logo(data.get("logo"))
+        if not logo["ok"]:
+            champs["logo"] = logo["message"]
+        elif logo["vide"]:
+            reglage.logo = None
+            reglage.logo_type = ""
+            suivi.extend(["logo", "logo_type"])
+        else:
+            reglage.logo = logo["octets"]
+            reglage.logo_type = logo["type"]
+            suivi.extend(["logo", "logo_type"])
     if champs:
         return erreur("Ces réglages ne sont pas valables.", champs=champs)
     if not reglage.routes_actives and reglage.fond_defaut == "routes":
@@ -444,3 +459,15 @@ def reglages(request):
         inscriptions_ouvertes=bool(reglage.inscriptions_ouvertes),
     )
     return reponse(lire())
+
+
+@require_GET
+def logo(request):
+    reglage = courant()
+    brut = bytes(reglage.logo) if reglage.logo else b""
+    type_image = _type_image(brut)
+    if not brut or not type_image:
+        return erreur("Aucun logo n'est publié.", status=404)
+    response = HttpResponse(brut, content_type=type_image)
+    response["Cache-Control"] = "public, max-age=86400"
+    return response

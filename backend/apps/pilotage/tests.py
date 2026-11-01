@@ -1,3 +1,4 @@
+import base64
 import json
 from datetime import timedelta
 
@@ -361,3 +362,45 @@ class AdminConsoleTests(TestCase):
         self.assertEqual(publie.json()["lien_android"], "https://exemple.invalid/app.apk")
         self.assertEqual(publie.json()["lien_apple"], "")
         self.assertEqual(self.client.get("/api/carte/").json()["reglages"]["lien_android"], "https://exemple.invalid/app.apk")
+
+    def test_admin_can_publish_and_remove_the_map_logo(self):
+        png = bytes.fromhex(
+            "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de"
+            "0000000c49444154789c63f8cfc00000000300010005fe02fedccc59e7"
+            "0000000049454e44ae426082"
+        )
+        _inscrire(self.client, "logo@wayize.ga")
+        entree = _post(
+            self.client,
+            "/api/admin/entree/",
+            {"email": "logo@wayize.ga", "mot_de_passe": "libreville"},
+        )
+        jeton = entree.json()["jeton"]
+        self.assertEqual(self.client.get("/api/logo/").status_code, 404)
+        corps = {
+            "duree_heures": 3,
+            "seuil_degage": 2,
+            "plafond_heure": 8,
+            "prix_premium": 1500,
+            "fond_defaut": "satellite",
+            "routes_actives": True,
+            "inscriptions_ouvertes": True,
+        }
+        refuse = _post(self.client, "/api/admin/reglages/", {**corps, "logo": base64.b64encode(b"pas-une-image").decode()}, jeton)
+        self.assertEqual(refuse.status_code, 400)
+        self.assertIn("logo", refuse.json()["erreurs"])
+        code = base64.b64encode(png).decode()
+        with self.assertLogs("wayize", level="INFO") as captured:
+            publie = _post(self.client, "/api/admin/reglages/", {**corps, "logo": code}, jeton)
+        self.assertEqual(publie.status_code, 200, publie.content)
+        self.assertTrue(publie.json()["logo"].startswith("/api/logo/?v="))
+        self.assertNotIn(code, "\n".join(captured.output))
+        image = self.client.get("/api/logo/")
+        self.assertEqual(image.status_code, 200)
+        self.assertEqual(image["Content-Type"], "image/png")
+        self.assertEqual(image.content, png)
+        self.assertEqual(self.client.get("/api/carte/").json()["reglages"]["logo"], publie.json()["logo"])
+        retire = _post(self.client, "/api/admin/reglages/", {**corps, "logo": ""}, jeton)
+        self.assertEqual(retire.status_code, 200, retire.content)
+        self.assertEqual(retire.json()["logo"], "")
+        self.assertEqual(self.client.get("/api/logo/").status_code, 404)

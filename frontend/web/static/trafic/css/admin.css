@@ -881,6 +881,17 @@ body.is-leaving .wa-progress span { animation: wa-load 0.9s ease forwards; }
   font-variant-numeric: tabular-nums;
 }
 .wa-set-value span { color: var(--wa-muted); font-size: 0.88rem; min-width: 4.5rem; }
+.wa-logo-preview {
+  display: block;
+  width: 48px;
+  height: 48px;
+  margin-top: 10px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #141414;
+}
+.wa-logo-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.wa-logo-actions input[type="file"] { max-width: 100%; font: inherit; }
 .wa-set-url { grid-template-columns: minmax(0, 1fr); }
 .wa-set-url input {
   width: 100%;

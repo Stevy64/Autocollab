@@ -13,6 +13,8 @@ class Pilotage(models.Model):
     inscriptions_ouvertes = models.BooleanField(default=True)
     lien_android = models.CharField(max_length=300, blank=True, default="")
     lien_apple = models.CharField(max_length=300, blank=True, default="")
+    logo = models.BinaryField(null=True, blank=True)
+    logo_type = models.CharField(max_length=32, blank=True, default="")
 
     class Meta:
         verbose_name = "pilotage"

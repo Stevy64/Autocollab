@@ -82,6 +82,10 @@ def charger(pk):
     return base_signalements().get(pk=pk)
 
 
+def est_auteur(signalement, cle):
+    return bool(cle) and bool(signalement.session_cle) and signalement.session_cle == cle
+
+
 def reponse_signalement(request, pk, status=200, lieu=None):
     try:
         item = charger(pk)
@@ -90,7 +94,7 @@ def reponse_signalement(request, pk, status=200, lieu=None):
     cle = cle_session(request)
     appuye = item.id in ids_appuyes(cle, [item.id])
     degage = item.id in ids_degages(cle, [item.id])
-    corps = {"signalement": signalement_public(item, appuye, degage)}
+    corps = {"signalement": signalement_public(item, appuye, degage, est_auteur(item, cle))}
     if lieu:
         corps["lieu"] = lieu
     return reponse(corps, status=status)
@@ -139,7 +143,7 @@ def lister(request):
     return reponse(
         {
             "signalements": [
-                signalement_public(item, item.id in appuyes, item.id in degages)
+                signalement_public(item, item.id in appuyes, item.id in degages, est_auteur(item, cle))
                 for item in items
             ],
             "tendance": tendance(items, heures=reglage["duree_heures"]),
@@ -253,3 +257,51 @@ def creer(request):
     )
     lieu_enregistre = memoiser_lieu(signalement.lieu, signalement.latitude, signalement.longitude)
     return reponse_signalement(request, signalement.pk, status=201, lieu=lieu_enregistre)
+
+
+@protege("signalements")
+def position(request, pk):
+    """L'auteur replace son point. Le nom du lieu et le catalogue ne bougent pas."""
+    if request.method != "POST":
+        return erreur("Méthode non prise en charge.", status=405)
+    data, message = lire_json(request)
+    if data is None:
+        return erreur(message)
+    try:
+        signalement = Signalement.objects.get(pk=pk)
+    except Signalement.DoesNotExist:
+        return erreur("Signalement introuvable.", status=404)
+    cle = cle_session(request)
+    if not est_auteur(signalement, cle):
+        journal(
+            "signalements",
+            "signalement.move_rejected",
+            level="warning",
+            request_id=request_id(request),
+            signalement_id=pk,
+            status=403,
+        )
+        return erreur("Seul l'auteur peut déplacer ce point.", status=403)
+    latitude = nombre(data.get("latitude"))
+    longitude = nombre(data.get("longitude"))
+    if latitude is None or longitude is None or not dans_libreville(latitude, longitude):
+        return erreur(
+            "Ce point est en dehors du Grand Libreville.",
+            champs={"lieu": "Ce point est en dehors du Grand Libreville."},
+        )
+    signalement.latitude = latitude
+    signalement.longitude = longitude
+    try:
+        signalement.save(update_fields=["latitude", "longitude"])
+    except IntegrityError:
+        return erreur(
+            "Ce signalement ne peut pas être enregistré.",
+            champs={"lieu": "Ce point est en dehors du Grand Libreville."},
+        )
+    journal(
+        "signalements",
+        "signalement.moved",
+        request_id=request_id(request),
+        signalement_id=signalement.pk,
+    )
+    return reponse_signalement(request, pk)

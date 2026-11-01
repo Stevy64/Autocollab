@@ -100,7 +100,7 @@ def commentaire_public(commentaire):
     }
 
 
-def signalement_public(signalement, appuye, degage=False):
+def signalement_public(signalement, appuye, degage=False, mien=False):
     notes = getattr(signalement, "notes_recentes", None)
     if notes is None:
         notes = list(signalement.commentaires.all()[:30])

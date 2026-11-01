@@ -13,7 +13,7 @@
 <div class="wa-flash is-error" role="alert">{{ erreur }}</div>
 {% endif %}
 
-<form class="wa-panel wa-settings" method="post" action="{% url 'admin-reglages' %}">
+<form class="wa-panel wa-settings" method="post" action="{% url 'admin-reglages' %}" enctype="multipart/form-data">
   {% csrf_token %}
 
   <div class="wa-block">
@@ -29,6 +29,25 @@
       <input id="inscriptions" name="inscriptions_ouvertes" type="checkbox" value="1"{% if reglages.inscriptions_ouvertes %} checked{% endif %}>
       <span>Ouvertes</span>
     </label>
+  </div>
+
+  <div class="wa-set wa-set-url">
+    <div>
+      <label for="logo">{% include "admin/icone.html" with name="image" %} Logo</label>
+      <p class="wa-field-help">PNG, JPEG ou WebP, 600 Ko maximum. Il remplace le repère à côté de Wayizé sur la carte. Sans fichier, le repère actuel reste.</p>
+      {% if reglages.logo %}
+      <img class="wa-logo-preview" src="{{ reglages.logo }}" alt="Logo publié">
+      {% endif %}
+    </div>
+    <div class="wa-logo-actions">
+      <input id="logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp">
+      {% if reglages.logo %}
+      <label class="wa-check" for="retirer_logo">
+        <input id="retirer_logo" name="retirer_logo" type="checkbox" value="1">
+        <span>Retirer</span>
+      </label>
+      {% endif %}
+    </div>
   </div>
 
   <div class="wa-block">

@@ -1,5 +1,6 @@
 """Pages de la console. Le jeton reste dans la session, jamais dans le HTML."""
 
+import base64
 import json
 from urllib.error import URLError
 from urllib.parse import urlencode
@@ -125,7 +126,25 @@ def _reglages(data):
         "inscriptions_ouvertes": data.get("inscriptions_ouvertes") is not False,
         "lien_android": _lien_lu(data.get("lien_android")),
         "lien_apple": _lien_lu(data.get("lien_apple")),
+        "logo": _logo_lu(data.get("logo")),
     }
+
+
+def _logo_lu(valeur):
+    propre = str(valeur or "").strip()
+    if propre.startswith("/api/logo/?v=") and " " not in propre and len(propre) < 80:
+        return propre
+    return ""
+
+
+def _type_logo(brut):
+    if brut.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if brut.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if len(brut) >= 12 and brut.startswith(b"RIFF") and brut[8:12] == b"WEBP":
+        return "image/webp"
+    return ""
 
 
 def _lien_lu(valeur):
@@ -530,35 +549,50 @@ def reglages(request):
         liens_ok = all(
             not saisi[cle] or _lien_lu(saisi[cle]) for cle in ("lien_android", "lien_apple")
         )
+        fichier = request.FILES.get("logo")
+        logo_envoye = None
+        logo_invalide = False
+        if fichier and getattr(fichier, "size", 1):
+            brut = fichier.read(600 * 1024 + 1)
+            if len(brut) > 600 * 1024 or not _type_logo(brut):
+                logo_invalide = True
+            else:
+                logo_envoye = base64.b64encode(brut).decode("ascii")
+        elif request.POST.get("retirer_logo") == "1":
+            logo_envoye = ""
         duree = _borne_saisie(saisi["duree_heures"], 1, 12)
         seuil = _borne_saisie(saisi["seuil_degage"], 2, 5)
         plafond = _borne_saisie(saisi["plafond_heure"], 1, 24)
         prix = _borne_saisie(saisi["prix_premium"], 0, 100000)
-        if None in (duree, seuil, plafond, prix) or fond not in ("satellite", "routes") or not liens_ok:
+        if (
+            logo_invalide
+            or None in (duree, seuil, plafond, prix)
+            or fond not in ("satellite", "routes")
+            or not liens_ok
+        ):
             ctx = _coquille(request, "reglages")
-            ctx["erreur"] = (
-                "Les liens Android et Apple doivent commencer par https://, ou rester vides."
-                if not liens_ok
-                else "Vérifiez les bornes : durée 1–12 h, votes « dégagé » 2–5, plafond 1–24, prix 0–100 000 F."
-            )
+            if logo_invalide:
+                ctx["erreur"] = "Le logo doit être une image PNG, JPEG ou WebP, de 600 Ko au plus."
+            elif not liens_ok:
+                ctx["erreur"] = "Les liens Android et Apple doivent commencer par https://, ou rester vides."
+            else:
+                ctx["erreur"] = "Vérifiez les bornes : durée 1–12 h, votes « dégagé » 2–5, plafond 1–24, prix 0–100 000 F."
             ctx["reglages"] = saisi
             return _html(request, "admin/reglages.html", ctx)
-        status, data = _api(
-            request,
-            "/api/admin/reglages/",
-            method="POST",
-            payload={
-                "duree_heures": duree,
-                "seuil_degage": seuil,
-                "plafond_heure": plafond,
-                "prix_premium": prix,
-                "fond_defaut": fond,
-                "routes_actives": saisi["routes_actives"],
-                "inscriptions_ouvertes": saisi["inscriptions_ouvertes"],
-                "lien_android": _lien_lu(saisi["lien_android"]),
-                "lien_apple": _lien_lu(saisi["lien_apple"]),
-            },
-        )
+        payload = {
+            "duree_heures": duree,
+            "seuil_degage": seuil,
+            "plafond_heure": plafond,
+            "prix_premium": prix,
+            "fond_defaut": fond,
+            "routes_actives": saisi["routes_actives"],
+            "inscriptions_ouvertes": saisi["inscriptions_ouvertes"],
+            "lien_android": _lien_lu(saisi["lien_android"]),
+            "lien_apple": _lien_lu(saisi["lien_apple"]),
+        }
+        if logo_envoye is not None:
+            payload["logo"] = logo_envoye
+        status, data = _api(request, "/api/admin/reglages/", method="POST", payload=payload)
         bounce = _refuser(request, status, data)
         if bounce:
             return bounce
@@ -566,7 +600,7 @@ def reglages(request):
             _flash(request, "Réglages enregistrés. La carte les applique tout de suite.")
             return redirect("admin-reglages")
         ctx = _coquille(request, "reglages")
-        ctx["erreur"] = data.get("message") or "Enregistrement impossible."
+        ctx["erreur"] = (data.get("erreurs") or {}).get("logo") or data.get("message") or "Enregistrement impossible."
         ctx["reglages"] = _reglages(data if "duree_heures" in data else saisi)
         return _html(request, "admin/reglages.html", ctx)
     status, data = _api(request, "/api/admin/reglages/")

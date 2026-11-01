@@ -290,3 +290,48 @@ class MapSliceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ok"])
         self.assertTrue(response["X-Request-Id"])
+
+    def test_author_can_move_the_point_without_moving_the_catalogue(self):
+        from apps.lieux.models import Lieu
+
+        created = self.post_json("/api/signalements/", payload())
+        self.assertEqual(created.status_code, 201, created.content)
+        report = created.json()["signalement"]
+        self.assertTrue(report["mien"])
+        pk = report["id"]
+        glass = Lieu.objects.get(nom="Glass")
+        avant = (glass.latitude, glass.longitude)
+        autre = Client(HTTP_X_WAYIZE_SESSION=AUTRE)
+        refuse = autre.post(
+            f"/api/signalements/{pk}/position/",
+            data=json.dumps({"latitude": 0.39, "longitude": 9.46}),
+            content_type="application/json",
+        )
+        self.assertEqual(refuse.status_code, 403)
+        self.assertIn("auteur", refuse.json()["message"])
+        dehors = self.post_json(
+            f"/api/signalements/{pk}/position/",
+            {"latitude": 0.4, "longitude": 8.9},
+        )
+        self.assertEqual(dehors.status_code, 400)
+        with self.assertLogs("wayize", level="INFO") as captured:
+            bouge = self.post_json(
+                f"/api/signalements/{pk}/position/",
+                {"latitude": 0.39, "longitude": 9.46},
+            )
+        self.assertEqual(bouge.status_code, 200, bouge.content)
+        place = bouge.json()["signalement"]
+        self.assertEqual(place["latitude"], 0.39)
+        self.assertEqual(place["longitude"], 9.46)
+        self.assertEqual(place["lieu"], "Glass")
+        self.assertTrue(place["mien"])
+        glass.refresh_from_db()
+        self.assertEqual((glass.latitude, glass.longitude), avant)
+        self.assertIn("signalement.moved", "\n".join(captured.output))
+        liste = self.client.get("/api/signalements/").json()["signalements"]
+        vu = next(item for item in liste if item["id"] == pk)
+        self.assertTrue(vu["mien"])
+        vu_autre = next(
+            item for item in autre.get("/api/signalements/").json()["signalements"] if item["id"] == pk
+        )
+        self.assertFalse(vu_autre["mien"])

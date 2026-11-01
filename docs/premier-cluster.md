@@ -733,7 +733,7 @@ spec:
         - name: static
           image: ghcr.io/stevy64/wayize:main
           imagePullPolicy: Always
-          command: ["sh", "-c", "cp -a /app/frontend/staticfiles/. /static/ && chmod -R a+rX /static"]
+          command: ["sh", "-c", "cp -R /app/frontend/staticfiles/. /static/ && find /static -mindepth 1 -exec chmod a+rX {} +"]
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001
