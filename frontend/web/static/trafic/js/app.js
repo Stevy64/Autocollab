@@ -116,7 +116,7 @@ const FAQ = [
   {
     id: "install",
     q: "Comment installer Wayizé ?",
-    a: "À l'ouverture, Wayizé propose de s'installer. Le bouton Installer ajoute l'application quand le navigateur le permet. Sur iPhone : Partager, puis Sur l'écran d'accueil. Un lien Android ou Apple n'apparaît que s'il a été publié dans les paramètres.",
+    a: "Le bouton Installer ajoute Wayizé sur le téléphone, pour l'utiliser sans passer par un navigateur. Sur iPhone : Partager, puis Sur l'écran d'accueil. Un lien Android ou Apple n'apparaît que s'il a été publié dans les paramètres.",
   },
   {
     id: "retrait",
@@ -705,13 +705,14 @@ function appliquerFond(id) {
   if (!map) return;
   if (choisi === "routes") {
     if (map.hasLayer(fondSatellite)) map.removeLayer(fondSatellite);
+    if (map.hasLayer(fondAxes)) map.removeLayer(fondAxes);
     if (!map.hasLayer(fondRoutes)) fondRoutes.addTo(map);
   } else {
     if (map.hasLayer(fondRoutes)) map.removeLayer(fondRoutes);
     if (!map.hasLayer(fondSatellite)) fondSatellite.addTo(map);
+    if (!map.hasLayer(fondAxes)) fondAxes.addTo(map);
+    fondAxes.bringToFront();
   }
-  if (!map.hasLayer(fondAxes)) fondAxes.addTo(map);
-  fondAxes.bringToFront();
   document.querySelectorAll("[data-fond]").forEach((bouton) => {
     bouton.setAttribute("aria-pressed", bouton.dataset.fond === choisi ? "true" : "false");
   });
@@ -730,9 +731,9 @@ function initMap() {
   map.setMaxBounds(bounds.pad(0.2));
   map.setView([boot.centre.latitude, boot.centre.longitude], homeZoom());
 
-  // Satellite Esri, et plan des rues Esri. Le contraste est renforcé en CSS
-  // pour que les axes et les voies de quartier se lisent. Le trafic en direct
-  // des cartes commerciales demande une clé que ce serveur n'a pas.
+  // Satellite Esri, avec le tracé des axes par-dessus. Le mode Routes est la
+  // carte classique : fond clair, noms de voies, rues de la ville. Le trafic
+  // en direct des cartes commerciales demande une clé que ce serveur n'a pas.
   fondSatellite = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     {
@@ -746,13 +747,11 @@ function initMap() {
     { maxZoom: 19, maxNativeZoom: 18, attribution: "" },
   );
   fondRoutes = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+    "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
     {
-      className: "tuile-route",
       maxZoom: 19,
-      maxNativeZoom: 18,
-      attribution:
-        'Routes © <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, OSM',
+      maxNativeZoom: 19,
+      attribution: 'Carte © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     },
   );
   surveillerTuiles(fondSatellite);
@@ -1687,7 +1686,7 @@ function renderCompteInvite() {
       ${enteteCompte("Compte", "Choisissez un nouveau mot de passe.")}
       <form id="compte-form" class="auth" novalidate>
         <label class="auth-field" for="compte-mot"><span>Nouveau mot de passe</span></label>
-        <input id="compte-mot" class="field" type="password" autocomplete="new-password" minlength="8" required placeholder="8 caractères minimum">
+        ${champMot(`autocomplete="new-password" minlength="8" required placeholder="8 caractères minimum"`)}
         ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
         <button class="btn btn-primary btn-block" type="submit" ${state.compteEnCours ? "disabled" : ""}>${state.compteEnCours ? "Un instant…" : "Enregistrer"}</button>
       </form>
@@ -1707,7 +1706,7 @@ function renderCompteInvite() {
         <label class="auth-field" for="compte-pseudo"><span>Pseudo</span></label>
         <input id="compte-pseudo" class="field" type="text" maxlength="20" autocomplete="nickname" required value="${esc(state.comptePseudo || "")}" placeholder="Visible avec Premium">` : ""}
       <label class="auth-field" for="compte-mot"><span>Mot de passe</span></label>
-      <input id="compte-mot" class="field" type="password" autocomplete="${inscription ? "new-password" : "current-password"}" minlength="8" required placeholder="8 caractères minimum">
+      ${champMot(`autocomplete="${inscription ? "new-password" : "current-password"}" minlength="8" required placeholder="8 caractères minimum"`)}
       ${inscription ? `
         <label class="auth-cgu">
           <input id="compte-cgu" type="checkbox" ${state.compteCgu ? "checked" : ""}>
@@ -2865,10 +2864,25 @@ function restaurerMemoire() {
   }
 }
 
+function champMot(attributs) {
+  return `<div class="mot-ligne"><input id="compte-mot" class="field" type="password" ${attributs}><button type="button" class="mot-voir" data-action="voir-mot" aria-pressed="false" aria-label="Voir le mot de passe">Voir</button></div>`;
+}
+
 function onSheetClick(event) {
   const el = event.target.closest("[data-action]");
   if (!el) return;
   const action = el.dataset.action;
+  if (action === "voir-mot") {
+    const input = el.parentElement && el.parentElement.querySelector("input");
+    if (!input) return;
+    const visible = input.type === "password";
+    input.type = visible ? "text" : "password";
+    el.setAttribute("aria-pressed", visible ? "true" : "false");
+    el.textContent = visible ? "Masquer" : "Voir";
+    el.setAttribute("aria-label", visible ? "Masquer le mot de passe" : "Voir le mot de passe");
+    input.focus();
+    return;
+  }
   if (action === "filter") setFilter(el.dataset.filter);
   else if (action === "open") selectReport(Number(el.dataset.id));
   else if (action === "back") goBack();
@@ -3249,10 +3263,7 @@ function proposerInstall() {
   if (reporte && Date.now() - reporte < 3 * 24 * 60 * 60 * 1000) return;
   const android = lienApp("lien_android");
   const apple = lienApp("lien_apple");
-  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const precision = ios && !inviteInstall
-    ? "Sur iPhone : Partager, puis Sur l'écran d'accueil."
-    : "Elle s'ouvre ensuite comme une application, sans boutique.";
+  const precision = "Pour l'utiliser dans votre téléphone sans passer par un navigateur.";
   const natif = [
     android ? `<a href="${esc(android)}" target="_blank" rel="noopener noreferrer">Android</a>` : "",
     apple ? `<a href="${esc(apple)}" target="_blank" rel="noopener noreferrer">Apple</a>` : "",
@@ -3260,19 +3271,20 @@ function proposerInstall() {
   const bandeau = document.createElement("aside");
   bandeau.id = "install-banner";
   bandeau.className = "install-banner";
-  bandeau.innerHTML = `<strong>Installer Wayizé</strong><p>${precision}</p><div class="install-actions"><button type="button" data-install ${inviteInstall ? "" : "hidden"}>Installer</button>${natif}<button type="button" class="is-quiet" data-plus-tard>Plus tard</button></div>`;
+  bandeau.innerHTML = `<strong>Installer Wayizé</strong><p>${precision}</p><div class="install-actions"><button type="button" data-install>Installer</button>${natif}<button type="button" class="is-quiet" data-plus-tard>Plus tard</button></div>`;
   document.body.appendChild(bandeau);
   const bouton = bandeau.querySelector("[data-install]");
-  bouton.addEventListener("click", async () => {
+  bouton.addEventListener("click", () => {
     if (!inviteInstall) return;
+    const evenement = inviteInstall;
     bouton.classList.add("is-busy");
-    try {
-      await inviteInstall.prompt();
+    evenement.prompt().then(() => evenement.userChoice).then((choix) => {
       inviteInstall = null;
-      bouton.hidden = true;
-    } catch (error) {
+      if (choix && choix.outcome === "accepted") bandeau.remove();
+      else bouton.classList.remove("is-busy");
+    }).catch(() => {
       bouton.classList.remove("is-busy");
-    }
+    });
   });
   bandeau.querySelector("[data-plus-tard]").addEventListener("click", () => {
     try { localStorage.setItem("wayize.install.reporte", String(Date.now())); } catch (error) { /* le bandeau revient à la prochaine visite */ }
@@ -3283,10 +3295,15 @@ function proposerInstall() {
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   inviteInstall = event;
-  const bouton = document.querySelector("#install-banner [data-install]");
-  if (bouton) bouton.hidden = false;
-  else if (boot) proposerInstall();
+  if (!document.getElementById("install-banner") && boot) proposerInstall();
 });
+window.addEventListener("appinstalled", () => {
+  const bandeau = document.getElementById("install-banner");
+  if (bandeau) bandeau.remove();
+});
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
 
 function start() {
   boot = JSON.parse(document.getElementById("boot-data").textContent);

@@ -32,6 +32,7 @@ def manifest(request):
         "description": "Signalements de circulation à Libreville, partagés par les usagers.",
         "lang": "fr",
         "dir": "ltr",
+        "id": "/",
         "start_url": "/",
         "scope": "/",
         "display": "standalone",

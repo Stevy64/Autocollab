@@ -956,6 +956,22 @@ body.is-leaving .wa-progress span { animation: wa-load 0.9s ease forwards; }
   border-radius: 12px;
   background: #fff;
 }
+.wa-voir {
+  position: absolute;
+  right: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wa-ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wa-field:has(.wa-voir) input { padding-right: 88px; }
+.wa-voir[aria-pressed="true"] { background: var(--wa-soft); }
 .wa-form .wa-btn { margin-top: 18px; min-height: 48px; }
 .wa-login-card .wa-note {
   margin: 18px 0 0;

@@ -1137,6 +1137,25 @@ body.is-compose .sheet-content {
   border-radius: 12px;
   background: #fafaf9;
 }
+.mot-ligne { position: relative; }
+.mot-ligne .field { padding-right: 88px; }
+.mot-voir {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mot-voir[aria-pressed="true"] { background: var(--soft); }
 .auth .btn-block { margin-top: 16px; }
 .auth-lien {
   display: inline-flex;
@@ -1161,9 +1180,6 @@ body.is-compose .sheet-content {
   pointer-events: none;
 }
 .lieu-nom span.is-pres { font-size: 13px; }
-.tuile-route {
-  filter: contrast(1.25) saturate(2) brightness(0.82);
-}
 body.is-routes .lieu-nom span {
   color: #1c1917;
   text-shadow:

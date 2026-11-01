@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex">
   <title>Connexion — Administration Wayizé</title>
   <link rel="icon" href="{% static 'trafic/icons/favicon-32.png' %}" sizes="32x32" type="image/png">
-  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}?v=20261101m">
+  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}?v=20261101o">
 </head>
 <body class="wa wa-auth">
   <main class="wa-login">
@@ -19,8 +19,8 @@
       <span>Wayizé</span>
     </a>
     <section class="wa-card wa-login-card">
-      <h1>Connexion</h1>
-      <p class="wa-lead">Alertes, usagers et paramètres du site.</p>
+      <h1>Espace d'administration</h1>
+      <p class="wa-lead">Connexion. Alertes, usagers et paramètres du site.</p>
       {% if flash %}
       <div class="wa-flash{% if flash.erreur %} is-error{% endif %}" role="status">{{ flash.texte }}</div>
       {% endif %}
@@ -38,6 +38,7 @@
         <div class="wa-field">
           <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="lock" %}</span>
           <input id="mot" name="mot_de_passe" type="password" autocomplete="current-password" required minlength="4" maxlength="72" placeholder="Mot de passe">
+          <button type="button" class="wa-voir" aria-pressed="false" aria-controls="mot" aria-label="Voir le mot de passe">Voir</button>
         </div>
         <button class="wa-btn wa-btn-dark wa-btn-block" type="submit">Entrer</button>
       </form>
@@ -45,5 +46,16 @@
       <a class="wa-text-link" href="/">Retour à la carte</a>
     </section>
   </main>
+  <script>
+    document.querySelector(".wa-voir").addEventListener("click", function () {
+      const input = document.getElementById("mot");
+      const visible = input.type === "password";
+      input.type = visible ? "text" : "password";
+      this.setAttribute("aria-pressed", visible ? "true" : "false");
+      this.textContent = visible ? "Masquer" : "Voir";
+      this.setAttribute("aria-label", visible ? "Masquer le mot de passe" : "Voir le mot de passe");
+      input.focus();
+    });
+  </script>
 </body>
 </html>
