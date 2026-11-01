@@ -94,6 +94,7 @@ def commentaire_public(commentaire):
     return {
         "id": commentaire.id,
         "texte": commentaire.texte,
+        "auteur": getattr(commentaire, "auteur", "") or "Un usager",
         "relatif": relatif(commentaire.cree_le),
         "cree_le": commentaire.cree_le.isoformat(),
     }

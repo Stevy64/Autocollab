@@ -5,10 +5,14 @@ from .models import Pilotage
 DUREE_DEFAUT = 3
 SEUIL_DEFAUT = 2
 PLAFOND_DEFAUT = 8
+PRIX_DEFAUT = 1500
+FOND_DEFAUT = "satellite"
 
 DUREE_MIN, DUREE_MAX = 1, 12
 SEUIL_MIN, SEUIL_MAX = 2, 5
 PLAFOND_MIN, PLAFOND_MAX = 1, 24
+PRIX_MIN, PRIX_MAX = 0, 100000
+FONDS = ("satellite", "routes")
 
 
 def _borne(valeur, bas, haut, defaut):
@@ -21,6 +25,12 @@ def _borne(valeur, bas, haut, defaut):
     return n
 
 
+def _fond(valeur):
+    if valeur in FONDS:
+        return valeur
+    return FOND_DEFAUT
+
+
 def courant():
     reglage, _cree = Pilotage.objects.get_or_create(
         pk=1,
@@ -28,6 +38,10 @@ def courant():
             "duree_heures": DUREE_DEFAUT,
             "seuil_degage": SEUIL_DEFAUT,
             "plafond_heure": PLAFOND_DEFAUT,
+            "prix_premium": PRIX_DEFAUT,
+            "fond_defaut": FOND_DEFAUT,
+            "routes_actives": True,
+            "inscriptions_ouvertes": True,
         },
     )
     return reglage
@@ -35,8 +49,26 @@ def courant():
 
 def lire():
     reglage = courant()
+    routes = bool(reglage.routes_actives)
+    fond = _fond(reglage.fond_defaut)
+    if not routes:
+        fond = FOND_DEFAUT
     return {
         "duree_heures": _borne(reglage.duree_heures, DUREE_MIN, DUREE_MAX, DUREE_DEFAUT),
         "seuil_degage": _borne(reglage.seuil_degage, SEUIL_MIN, SEUIL_MAX, SEUIL_DEFAUT),
         "plafond_heure": _borne(reglage.plafond_heure, PLAFOND_MIN, PLAFOND_MAX, PLAFOND_DEFAUT),
+        "prix_premium": _borne(reglage.prix_premium, PRIX_MIN, PRIX_MAX, PRIX_DEFAUT),
+        "fond_defaut": fond,
+        "routes_actives": routes,
+        "inscriptions_ouvertes": bool(reglage.inscriptions_ouvertes),
+    }
+
+
+def publics():
+    """Ce que la carte peut afficher, sans les plafonds internes."""
+    lu = lire()
+    return {
+        "prix_premium": lu["prix_premium"],
+        "fond_defaut": lu["fond_defaut"],
+        "routes_actives": lu["routes_actives"],
     }

@@ -117,6 +117,25 @@ class MapSliceTests(TestCase):
         )
         self.assertEqual(libre.status_code, 201, libre.content)
         self.assertEqual(libre.json()["signalement"]["lieu"], "Okala")
+        self.assertEqual(libre.json()["lieu"]["nom"], "Okala")
+        from apps.lieux.models import Lieu
+
+        self.assertEqual(Lieu.objects.filter(nom="Okala").count(), 1)
+        encore = self.post_json(
+            "/api/signalements/",
+            payload(
+                lieu="okala",
+                latitude=0.39,
+                longitude=9.46,
+                commentaire="Le même quartier, orthographe différente.",
+            ),
+        )
+        self.assertEqual(encore.status_code, 201, encore.content)
+        self.assertEqual(Lieu.objects.filter(cle="okala").count(), 1)
+        self.assertEqual(Lieu.objects.get(cle="okala").latitude, libre.json()["lieu"]["latitude"])
+        noms = {item["nom"] for item in self.client.get("/api/carte/").json()["lieux"]}
+        self.assertIn("Okala", noms)
+        self.assertIn("Mont-Bouët", noms)
 
         missing = self.post_json("/api/signalements/", payload(commentaire="court"))
         self.assertEqual(missing.status_code, 400)

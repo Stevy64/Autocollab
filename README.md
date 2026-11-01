@@ -137,7 +137,7 @@ L’en-tête de réponse `X-Request-Id` est le même des deux côtés, ce qui re
 
 ## Cette version
 
-- Carte centrée sur Libreville, fond OpenStreetMap.
+- Carte centrée sur Libreville. Fond satellite ou plan routier (Esri).
 - Signalement manuel : type, phrase courte, quartier de la liste ou nom saisi, avec un point sur la carte si le nom est nouveau.
 - Confirmation, que l'on peut retirer, et précisions courtes, avec les compteurs.
 - Liste des signalements récents, qui recentre la carte. Une alerte disparaît au bout de trois heures (réglable). Deux usagers qui disent « c'est dégagé » la retirent tout de suite ; un seul vote reste visible. Le seuil est réglable.
@@ -154,7 +154,7 @@ Le paiement mobile money n’est pas branché : activer Premium enregistre le dr
 
 ## Crédits
 
-- Carte : données [OpenStreetMap](https://www.openstreetmap.org/copyright), tuiles [OSM France](https://www.openstreetmap.fr/). Le serveur `tile.openstreetmap.org` refuse l'application.
+- Carte : images satellite et plan topographique [Esri](https://www.esri.com/) (Maxar, HERE, Garmin, USGS, OpenStreetMap). Le trafic en direct des cartes commerciales n'est pas branché.
 - [Leaflet](https://leafletjs.com/) 1.9.4 (BSD-2-Clause), fichiers dans `frontend/web/static/trafic/vendor/leaflet/`.
 - DM Sans, licence SIL Open Font License : `frontend/web/static/trafic/fonts/OFL.txt`.
 - Découpage des services : [Gabomazone_SPA](https://github.com/Stevy64/Gabomazone_SPA).

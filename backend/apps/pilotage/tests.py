@@ -270,3 +270,53 @@ class AdminConsoleTests(TestCase):
             HTTP_X_WAYIZE_COMPTE=jeton,
         )
         self.assertEqual(manquant.status_code, 404)
+
+    def test_site_settings_cover_price_map_and_closed_signups(self):
+        _inscrire(self.client, "ada@wayize.ga")
+        entree = _post(
+            self.client,
+            "/api/admin/entree/",
+            {"email": "ada@wayize.ga", "mot_de_passe": "libreville"},
+        )
+        jeton = entree.json()["jeton"]
+        avant = self.client.get("/api/admin/reglages/", HTTP_X_WAYIZE_COMPTE=jeton)
+        self.assertEqual(avant.json()["prix_premium"], 1500)
+        self.assertEqual(avant.json()["fond_defaut"], "satellite")
+        self.assertTrue(avant.json()["routes_actives"])
+        self.assertTrue(avant.json()["inscriptions_ouvertes"])
+
+        regle = _post(
+            self.client,
+            "/api/admin/reglages/",
+            {
+                "duree_heures": 3,
+                "seuil_degage": 2,
+                "plafond_heure": 8,
+                "prix_premium": 2500,
+                "fond_defaut": "routes",
+                "routes_actives": False,
+                "inscriptions_ouvertes": False,
+            },
+            jeton,
+        )
+        self.assertEqual(regle.status_code, 200, regle.content)
+        self.assertEqual(regle.json()["prix_premium"], 2500)
+        self.assertEqual(regle.json()["fond_defaut"], "satellite")
+        self.assertFalse(regle.json()["routes_actives"])
+        self.assertFalse(regle.json()["inscriptions_ouvertes"])
+        carte = self.client.get("/api/carte/")
+        self.assertEqual(carte.json()["reglages"]["prix_premium"], 2500)
+        self.assertFalse(carte.json()["reglages"]["routes_actives"])
+
+        ferme = _post(
+            self.client,
+            "/api/comptes/inscription/",
+            {"email": "ferme@wayize.ga", "mot_de_passe": "libreville"},
+        )
+        self.assertEqual(ferme.status_code, 403)
+        self.assertFalse(Compte.objects.filter(email="ferme@wayize.ga").exists())
+
+        abonnes = self.client.get("/api/admin/comptes/?filtre=abonnes", HTTP_X_WAYIZE_COMPTE=jeton)
+        self.assertEqual(abonnes.status_code, 200)
+        self.assertEqual(abonnes.json()["comptes"], [])
+        self.assertEqual(abonnes.json()["filtre"], "abonnes")

@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex">
   <title>Connexion — Administration Wayizé</title>
   <link rel="icon" href="{% static 'trafic/icons/favicon-32.png' %}" sizes="32x32" type="image/png">
-  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}">
+  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}?v=20261101h">
 </head>
 <body class="wa wa-auth">
   <main class="wa-login">
@@ -21,7 +21,7 @@
     <section class="wa-card wa-login-card">
       <p class="wa-kicker">Administration</p>
       <h1>Entrer dans la console</h1>
-      <p class="wa-lead">Pilotage de la carte : signalements, comptes et règles. Rien ici ne suit un trajet.</p>
+      <p class="wa-lead">Pilotage du site : alertes, usagers, abonnés et paramètres. Rien ici ne suit un trajet.</p>
       {% if flash %}
       <div class="wa-flash{% if flash.erreur %} is-error{% endif %}" role="status">{{ flash.texte }}</div>
       {% endif %}

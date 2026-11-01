@@ -1,11 +1,25 @@
 from django.views.decorators.http import require_POST
 
+from apps.comptes.views import _compte
 from apps.http import erreur, lire_json, protege, texte_propre
 from apps.journal import journal, request_id
 from apps.signalements.models import Signalement
 from apps.signalements.views import purger_expires, reponse_signalement
 
 from .models import Commentaire
+
+
+def _auteur(request, data):
+    compte = _compte(request)
+    if compte is None or not compte.premium or not compte.pseudo:
+        return "Un usager"
+    if "anonyme" in data:
+        masquer = data.get("anonyme") is True
+    else:
+        masquer = bool(compte.anonyme)
+    if masquer:
+        return "Un usager"
+    return compte.pseudo[:24]
 
 
 @protege("commentaires")
@@ -71,7 +85,7 @@ def commentaire(request, pk):
             "La précision est trop longue.",
             champs={"texte": "200 caractères maximum."},
         )
-    note = Commentaire.objects.create(signalement_id=pk, texte=texte)
+    note = Commentaire.objects.create(signalement_id=pk, texte=texte, auteur=_auteur(request, data))
     journal(
         "commentaires",
         "commentaire.created",

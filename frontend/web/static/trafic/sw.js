@@ -6,6 +6,7 @@ const SHELL = [
   "/manifest.webmanifest",
   "/static/trafic/css/app.css",
   "/static/trafic/js/app.js",
+  "/static/trafic/js/quartiers.js",
   "/static/trafic/vendor/leaflet/leaflet.css",
   "/static/trafic/vendor/leaflet/leaflet.js",
   "/static/trafic/icons/icon-192.png",

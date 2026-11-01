@@ -12,5 +12,10 @@ def presenter(compte):
         "email": compte.email,
         "premium": compte.premium,
         "est_admin": compte.est_admin,
+        "pseudo": compte.pseudo,
+        "anonyme": compte.anonyme,
+        "confirme": bool(compte.confirme_le),
+        "domicile_id": compte.domicile_id,
+        "travail_id": compte.travail_id,
         "listes": listes,
     }

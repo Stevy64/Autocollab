@@ -7,6 +7,10 @@ class Pilotage(models.Model):
     duree_heures = models.PositiveSmallIntegerField(default=3)
     seuil_degage = models.PositiveSmallIntegerField(default=2)
     plafond_heure = models.PositiveSmallIntegerField(default=8)
+    prix_premium = models.PositiveIntegerField(default=1500)
+    fond_defaut = models.CharField(max_length=16, default="satellite")
+    routes_actives = models.BooleanField(default=True)
+    inscriptions_ouvertes = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = "pilotage"

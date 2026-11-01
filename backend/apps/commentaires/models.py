@@ -11,6 +11,7 @@ class Commentaire(models.Model):
         related_name="commentaires",
     )
     texte = models.CharField(max_length=200)
+    auteur = models.CharField(max_length=24, default="Un usager")
     cree_le = models.DateTimeField(default=timezone.now, db_index=True)
 
     class Meta:

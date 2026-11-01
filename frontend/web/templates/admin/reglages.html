@@ -1,11 +1,11 @@
 {% extends "admin/base.html" %}
-{% block title %}Réglages — Wayizé{% endblock %}
+{% block title %}Paramètres — Wayizé{% endblock %}
 {% block content %}
 <header class="wa-hero">
   <div>
-    <p class="wa-kicker">Règles</p>
-    <h1>Réglages</h1>
-    <p class="wa-lead">Ces trois nombres changent le comportement de la carte, tout de suite. Pas de suivi GPS.</p>
+    <p class="wa-kicker">Site</p>
+    <h1>Paramètres</h1>
+    <p class="wa-lead">Inscriptions, fond de carte, prix Premium et règles des alertes. Enregistré, c’est appliqué tout de suite.</p>
   </div>
 </header>
 
@@ -15,6 +15,72 @@
 
 <form class="wa-panel wa-settings" method="post" action="{% url 'admin-reglages' %}">
   {% csrf_token %}
+
+  <div class="wa-block">
+    <h2>{% include "admin/icone.html" with name="sliders" %} Paramètres du site</h2>
+    <p>Ce qui ouvre ou ferme la création de comptes. Les comptes déjà ouverts continuent de se connecter.</p>
+  </div>
+  <div class="wa-set">
+    <div>
+      <label for="inscriptions">{% include "admin/icone.html" with name="user" %} Inscriptions</label>
+      <p class="wa-field-help">Décochez pour refuser les nouveaux comptes le temps d’une maintenance.</p>
+    </div>
+    <label class="wa-check" for="inscriptions">
+      <input id="inscriptions" name="inscriptions_ouvertes" type="checkbox" value="1"{% if reglages.inscriptions_ouvertes %} checked{% endif %}>
+      <span>Ouvertes</span>
+    </label>
+  </div>
+
+  <div class="wa-block">
+    <h2>{% include "admin/icone.html" with name="map" %} Cartes</h2>
+    <p>Le plan routier est le fond topographique Esri : rues, relief et noms de Libreville. Le satellite reste les images Esri, avec le tracé des axes.</p>
+  </div>
+  <div class="wa-set">
+    <div>
+      <span class="wa-set-label">{% include "admin/icone.html" with name="map" %} Fond proposé à l’ouverture</span>
+      <p class="wa-field-help">S’applique aux visites qui n’ont pas encore choisi. Un choix déjà mémorisé dans le navigateur reste en place.</p>
+    </div>
+    <div class="wa-choice" role="radiogroup" aria-label="Fond proposé à l’ouverture">
+      <label>
+        <input type="radio" name="fond_defaut" value="satellite"{% if reglages.fond_defaut != "routes" %} checked{% endif %}>
+        <span>Satellite</span>
+      </label>
+      <label>
+        <input type="radio" name="fond_defaut" value="routes"{% if reglages.fond_defaut == "routes" %} checked{% endif %}>
+        <span>Routes</span>
+      </label>
+    </div>
+  </div>
+  <div class="wa-set">
+    <div>
+      <label for="routes">{% include "admin/icone.html" with name="pin" %} Plan routier</label>
+      <p class="wa-field-help">Décochez pour ne laisser que le satellite. Le fond par défaut redevient alors le satellite.</p>
+    </div>
+    <label class="wa-check" for="routes">
+      <input id="routes" name="routes_actives" type="checkbox" value="1"{% if reglages.routes_actives %} checked{% endif %}>
+      <span>Proposé</span>
+    </label>
+  </div>
+
+  <div class="wa-block">
+    <h2>{% include "admin/icone.html" with name="star" %} Abonnés et prix Premium</h2>
+    <p>Le montant s’affiche sur la carte. L’activation enregistre le droit sans débit : le paiement mobile money n’est pas branché.</p>
+  </div>
+  <div class="wa-set">
+    <div>
+      <label for="prix">{% include "admin/icone.html" with name="star" %} Prix affiché</label>
+      <p class="wa-field-help">De 0 à 100 000 F. Zéro affiche « offert ».</p>
+    </div>
+    <div class="wa-set-value">
+      <input class="wa-num" id="prix" name="prix_premium" type="number" inputmode="numeric" min="0" max="100000" required value="{{ reglages.prix_premium }}">
+      <span>F / mois</span>
+    </div>
+  </div>
+
+  <div class="wa-block">
+    <h2>{% include "admin/icone.html" with name="clock" %} Règles des alertes</h2>
+    <p>Ces trois nombres changent la vie d’un signalement sur la carte.</p>
+  </div>
   <div class="wa-set">
     <div>
       <label for="duree">{% include "admin/icone.html" with name="clock" %} Durée de vie d’une alerte</label>
@@ -25,7 +91,6 @@
       <span>heures</span>
     </div>
   </div>
-
   <div class="wa-set">
     <div>
       <label for="seuil">{% include "admin/icone.html" with name="check" %} Votes « c’est dégagé »</label>
@@ -36,7 +101,6 @@
       <span>votes</span>
     </div>
   </div>
-
   <div class="wa-set">
     <div>
       <label for="plafond">{% include "admin/icone.html" with name="gauge" %} Plafond par navigateur</label>

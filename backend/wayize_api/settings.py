@@ -54,6 +54,13 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+EMAIL_BACKEND = os.environ.get(
+    "WAYIZE_EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = os.environ.get("WAYIZE_EMAIL_FROM", "wayize@localhost")
+WAYIZE_PUBLIC_URL = os.environ.get("WAYIZE_PUBLIC_URL", "http://127.0.0.1:8647").rstrip("/")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

@@ -29,7 +29,7 @@ def manifest(request):
     payload = {
         "name": "Wayizé — Trafic à Libreville",
         "short_name": "Wayizé",
-        "description": "Signalements de circulation à Libreville, partagés par les conducteurs.",
+        "description": "Signalements de circulation à Libreville, partagés par les usagers.",
         "lang": "fr",
         "dir": "ltr",
         "start_url": "/",

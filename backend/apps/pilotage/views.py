@@ -20,8 +20,11 @@ from apps.signalements.present import relatif
 from .reglages import (
     DUREE_MAX,
     DUREE_MIN,
+    FONDS,
     PLAFOND_MAX,
     PLAFOND_MIN,
+    PRIX_MAX,
+    PRIX_MIN,
     SEUIL_MAX,
     SEUIL_MIN,
     courant,
@@ -78,8 +81,10 @@ def _fiche(compte):
     return {
         "id": compte.id,
         "email": compte.email,
+        "pseudo": compte.pseudo or "",
         "premium": bool(compte.premium),
         "est_admin": bool(compte.est_admin),
+        "confirme": compte.confirme_le is not None,
         "cree_le": compte.cree_le.isoformat(),
         "quand": _quand(compte.cree_le),
     }
@@ -253,11 +258,28 @@ def comptes(request):
     _admin, refus = _exiger_admin(request)
     if refus:
         return refus
-    lignes = [_fiche(compte) for compte in Compte.objects.order_by("-cree_le")[:200]]
+    filtre = (request.GET.get("filtre") or "").strip()
+    if filtre not in ("abonnes", "admins", "attente"):
+        filtre = ""
+    q = " ".join((request.GET.get("q") or "").split())[:80]
+    qs = Compte.objects.order_by("-cree_le")
+    if filtre == "abonnes":
+        qs = qs.filter(premium=True)
+    elif filtre == "admins":
+        qs = qs.filter(est_admin=True)
+    elif filtre == "attente":
+        qs = qs.filter(confirme_le__isnull=True)
+    if q:
+        qs = qs.filter(Q(email__icontains=q) | Q(pseudo__icontains=q))
+    lignes = [_fiche(compte) for compte in qs[:200]]
     return reponse(
         {
             "comptes": lignes,
             "admins": Compte.objects.filter(est_admin=True).count(),
+            "abonnes": Compte.objects.filter(premium=True).count(),
+            "attente": Compte.objects.filter(confirme_le__isnull=True).count(),
+            "filtre": filtre,
+            "q": q,
         }
     )
 
@@ -320,13 +342,38 @@ def reglages(request):
         champs["seuil_degage"] = f"Entre {SEUIL_MIN} et {SEUIL_MAX} votes."
     if plafond is None:
         champs["plafond_heure"] = f"Entre {PLAFOND_MIN} et {PLAFOND_MAX} signalements."
+    reglage = courant()
+    suivi = ["duree_heures", "seuil_degage", "plafond_heure"]
+    if "prix_premium" in data:
+        prix = _entier(data.get("prix_premium"), PRIX_MIN, PRIX_MAX)
+        if prix is None:
+            champs["prix_premium"] = f"Entre {PRIX_MIN} et {PRIX_MAX} F."
+        else:
+            reglage.prix_premium = prix
+            suivi.append("prix_premium")
+    if "fond_defaut" in data:
+        fond = data.get("fond_defaut")
+        if fond not in FONDS:
+            champs["fond_defaut"] = "Choisissez Satellite ou Routes."
+        else:
+            reglage.fond_defaut = fond
+            suivi.append("fond_defaut")
+    if "routes_actives" in data:
+        reglage.routes_actives = _drapeau(data.get("routes_actives"))
+        suivi.append("routes_actives")
+    if "inscriptions_ouvertes" in data:
+        reglage.inscriptions_ouvertes = _drapeau(data.get("inscriptions_ouvertes"))
+        suivi.append("inscriptions_ouvertes")
     if champs:
         return erreur("Ces réglages ne sont pas valables.", champs=champs)
-    reglage = courant()
+    if not reglage.routes_actives and reglage.fond_defaut == "routes":
+        reglage.fond_defaut = "satellite"
+        if "fond_defaut" not in suivi:
+            suivi.append("fond_defaut")
     reglage.duree_heures = duree
     reglage.seuil_degage = seuil
     reglage.plafond_heure = plafond
-    reglage.save(update_fields=["duree_heures", "seuil_degage", "plafond_heure"])
+    reglage.save(update_fields=suivi)
     journal(
         "pilotage",
         "reglages.updated",
@@ -335,5 +382,9 @@ def reglages(request):
         duree_heures=duree,
         seuil_degage=seuil,
         plafond_heure=plafond,
+        prix_premium=reglage.prix_premium,
+        fond_defaut=reglage.fond_defaut,
+        routes_actives=bool(reglage.routes_actives),
+        inscriptions_ouvertes=bool(reglage.inscriptions_ouvertes),
     )
     return reponse(lire())

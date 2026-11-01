@@ -1,7 +1,13 @@
 let boot = null;
 let map = null;
+let fondSatellite = null;
+let fondAxes = null;
+let fondRoutes = null;
 let markerLayer = null;
 let pickLayer = null;
+let nomLayer = null;
+let trajetLayer = null;
+let gpsLayer = null;
 let toastTimer = 0;
 let hashDone = false;
 
@@ -32,6 +38,163 @@ const GLYPH = {
   route_barree: '<rect x="1.2" y="4.2" width="13.6" height="7.6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M4 4.6 6.2 11.4M7.4 4.6 9.6 11.4M10.8 4.6l2.2 6.8" stroke="currentColor" stroke-width="1.4"/>',
   autre: '<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.1V11.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.8" r=".9" fill="currentColor"/>',
 };
+
+const PHRASES = {
+  bouchon: [
+    "Ça n'avance plus, plusieurs files.",
+    "Bouchon au feu, circulation très lente.",
+    "Embouteillage, prévoir un détour.",
+  ],
+  accident: [
+    "Accident sur la voie, circulation bloquée.",
+    "Véhicules arrêtés après un choc.",
+    "Accident, une voie est prise.",
+  ],
+  travaux: [
+    "Travaux sur la chaussée, passage étroit.",
+    "Chantier, la circulation est déviée.",
+    "Travaux, une file seulement.",
+  ],
+  police: [
+    "Contrôle de police, ça ralentit.",
+    "Contrôle sur la voie, files qui se forment.",
+    "Barrage policier, prévoyez du temps.",
+  ],
+  route_barree: [
+    "Route barrée, il faut faire demi-tour.",
+    "Voie fermée, aucun passage.",
+    "Route coupée, prenez un autre chemin.",
+  ],
+  autre: [
+    "Obstacle sur la voie, ralentissement.",
+    "Situation inhabituelle, soyez prudents.",
+    "Gêne à la circulation à cet endroit.",
+  ],
+};
+
+const FAQ = [
+  {
+    id: "quoi",
+    q: "Wayizé, c'est quoi ?",
+    a: "Une carte de la circulation à Libreville. Les usagers y signalent un bouchon, un accident, des travaux, un contrôle ou une route barrée. Les autres peuvent confirmer ou préciser.",
+  },
+  {
+    id: "compte",
+    q: "Faut-il un compte ?",
+    a: "Non. La carte et les signalements restent ouverts sans compte. Un compte confirme son adresse email. Premium ajoute le trajet domicile–travail, les listes, les alertes, le GPS, le mode conduite et un pseudo sur les précisions.",
+  },
+  {
+    id: "vite",
+    q: "Comment signaler vite ?",
+    a: "Touchez Signaler, choisissez le type, puis le quartier. Une phrase est déjà proposée : vous pouvez la garder ou en prendre une autre. Trois gestes suffisent. Si le lieu n'est pas dans la liste, touchez la carte.",
+  },
+  {
+    id: "duree",
+    q: "Combien de temps un signalement reste-t-il ?",
+    a: "Par défaut, environ trois heures. Ce délai peut être ajusté. Un signalement plus ancien disparaît de la carte.",
+  },
+  {
+    id: "confirmer",
+    q: "À quoi sert Confirmer ?",
+    a: "À dire que vous voyez la même chose. Le compteur augmente. Vous pouvez retirer votre confirmation en recliquant.",
+  },
+  {
+    id: "degage",
+    q: "À quoi sert C'est dégagé ?",
+    a: "À dire que la voie est libre. Par défaut, deux usagers qui le disent retirent l'alerte tout de suite. Un seul vote reste visible. Vous pouvez annuler le vôtre.",
+  },
+  {
+    id: "gps",
+    q: "La carte suit-elle ma position ?",
+    a: "Pas pour signaler. Le lieu se choisit dans la liste ou sur la carte. Le GPS n'existe que dans Premium : il prévient quand vous approchez d'un lieu suivi. Wayizé ne trace pas vos déplacements.",
+  },
+  {
+    id: "premium",
+    q: "Que comprend Premium, et est-ce payant ?",
+    a: "Listes de quartiers, trajet, alertes, GPS à l'approche, heures de vigilance, mode conduite et silence de deux heures. Sur cette version, activer Premium enregistre le droit sans débit : le paiement mobile money n'est pas branché.",
+  },
+  {
+    id: "install",
+    q: "Comment installer Wayizé ?",
+    a: "Dans le menu du navigateur, choisissez Ajouter à l'écran d'accueil. L'application s'ouvre ensuite comme une app, sans passer par une boutique.",
+  },
+  {
+    id: "retrait",
+    q: "Un signalement faux peut-il être retiré ?",
+    a: "Oui. Deux votes « dégagé » le retirent, ou il expire au bout de sa durée. Un administrateur peut aussi le retirer. N'écrivez ni nom, ni numéro, ni plaque.",
+  },
+];
+
+const CGU = [
+  {
+    titre: "1. Objet",
+    paragraphes: [
+      "Les présentes conditions générales d'utilisation (ci-après « CGU ») régissent l'accès et l'utilisation de l'application et du site Wayizé (ci-après le « Service »). En consultant la carte, en publiant un signalement ou en créant un compte, vous acceptez ces CGU. Si vous ne les acceptez pas, vous ne devez pas utiliser le Service.",
+    ],
+  },
+  {
+    titre: "2. Nature du Service",
+    paragraphes: [
+      "Wayizé est une carte collaborative de la circulation à Libreville, alimentée par les usagers. Le Service affiche des signalements, des confirmations et des précisions. Il n'est pas un service officiel de l'État, de la police ou de la voirie, et il ne remplace ni le code de la route, ni votre jugement au volant.",
+      "Les informations sont indicatives. Elles peuvent être incomplètes, inexactes ou déjà périmées. Vous restez seul responsable de votre conduite.",
+    ],
+  },
+  {
+    titre: "3. Signalements",
+    paragraphes: [
+      "Vous ne signalez que ce que vous constatez : un bouchon, un accident, des travaux, un contrôle, une route barrée ou une autre gêne. Une phrase et un lieu approximatif suffisent.",
+    ],
+    liste: [
+      "pas d'insultes, de rumeurs ni de contenus illicites ;",
+      "pas de nom, de numéro de téléphone, de plaque ou d'autre donnée personnelle ;",
+      "pas de signalement répété pour saturer la carte.",
+    ],
+  },
+  {
+    titre: "4. Compte et Premium",
+    paragraphes: [
+      "Le compte est facultatif. Vous êtes responsable de la confidentialité de votre mot de passe et de l'usage de votre compte. L'éditeur peut suspendre un accès en cas d'abus, de fraude ou d'usage contraire aux présentes CGU.",
+      "Premium ajoute des outils de veille (listes, trajet, alertes, GPS à l'approche, mode conduite). Sur cette version, l'activer enregistre un droit sur le serveur et n'effectue aucun débit. Lorsqu'un paiement sera proposé, son prix et ses conditions seront indiqués avant toute validation.",
+    ],
+  },
+  {
+    titre: "5. Données",
+    paragraphes: [
+      "Sans compte, une clé de session distingue votre navigateur pour les confirmations, les votes « dégagé » et le plafond de signalements. Elle ne constitue pas un compte. Avec un compte, l'adresse email et les listes de lieux sont enregistrées pour faire fonctionner le Service.",
+      "Les journaux techniques ne conservent ni le texte d'un signalement, ni le mot de passe, ni la clé de session.",
+    ],
+  },
+  {
+    titre: "6. Propriété intellectuelle",
+    paragraphes: [
+      "L'interface, le nom Wayizé et les textes du Service sont protégés. Le fond de carte vient d'OpenStreetMap. Toute extraction massive ou exploitation commerciale non autorisée est interdite.",
+    ],
+  },
+  {
+    titre: "7. Limitation de responsabilité",
+    paragraphes: [
+      "Le Service est fourni en l'état et selon disponibilité. Dans les limites autorisées par la loi, l'éditeur n'est pas responsable des dommages liés à l'utilisation de la carte, à un signalement inexact, à une indisponibilité ou à une décision prise sur la route à partir des informations affichées.",
+    ],
+  },
+  {
+    titre: "8. Modification des CGU",
+    paragraphes: [
+      "L'éditeur peut modifier les présentes CGU. La version applicable est celle affichée dans le Service à la date de consultation. Continuer à utiliser Wayizé après une mise à jour vaut acceptation des nouvelles conditions.",
+    ],
+  },
+  {
+    titre: "9. Droit applicable",
+    paragraphes: [
+      "Les présentes CGU sont régies par le droit gabonais. Tout litige relatif à leur interprétation ou à leur exécution sera soumis aux juridictions gabonaises compétentes, sous réserve des dispositions d'ordre public.",
+    ],
+  },
+  {
+    titre: "10. Acceptation",
+    paragraphes: [
+      "En utilisant le Service, en publiant un signalement ou en cochant la case d'acceptation lors de la création d'un compte, vous reconnaissez avoir lu et accepté les présentes CGU.",
+    ],
+  },
+];
 
 function emptyDraft() {
   return { type: "", commentaire: "", lieuId: "", lieu: "", latitude: null, longitude: null };
@@ -66,6 +229,21 @@ const state = {
   compteErreur: "",
   compteEnCours: false,
   compteEmail: "",
+  comptePseudo: "",
+  compteCgu: false,
+  compteMode: "connexion",
+  compteLien: "",
+  compteMessage: "",
+  compteJetonMail: "",
+  commentAnonyme: null,
+  gpsEtat: "Position en attente.",
+  veille: "",
+  comptePanneau: "veille",
+  autreTrajet: false,
+  legal: null,
+  faqOuverte: "",
+  lieuOuvert: false,
+  typesOuverts: false,
   dureeHeures: 3,
   seuilDegage: 2,
 };
@@ -86,6 +264,22 @@ function styleOf(type) {
 
 function iconSvg(type, size = 18) {
   return `<svg class="ui-icon" viewBox="0 0 16 16" width="${size}" height="${size}" aria-hidden="true">${GLYPH[type] || GLYPH.autre}</svg>`;
+}
+
+function iconeType(type, presse) {
+  const style = styleOf(type);
+  const fond = presse ? "#fff" : style.pin;
+  const encre = presse ? style.pin : style.chipText;
+  return `<span class="type-mini" style="background:${fond};color:${encre}">${iconSvg(type, 12)}</span>`;
+}
+
+function chipHtml(chip, attrs) {
+  const style = styleOf(chip.id);
+  const presse = attrs.includes('aria-pressed="true"');
+  const icone = GLYPH[chip.id]
+    ? `<span class="chip-ico" style="color:${presse ? "#fff" : style.pin}">${iconSvg(chip.id, 14)}</span>`
+    : "";
+  return `<button type="button" class="chip" ${attrs}><span class="chip-label">${icone}${esc(chip.label)}</span></button>`;
 }
 
 const UI = {
@@ -336,9 +530,19 @@ function haversine(lat1, lng1, lat2, lng2) {
 
 function fold(value) {
   return String(value || "")
+    .replace(/œ/g, "oe")
+    .replace(/æ/g, "ae")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+function cleNom(nom) {
+  return fold(nom)
+    .replace(/['’.-]/g, " ")
+    .replace(/\bpk\s+(\d+)\b/g, "pk$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function reportMatchesPlace(report, place) {
@@ -459,6 +663,62 @@ function setTitle() {
     : "Wayizé — Circulation à Libreville";
 }
 
+function surveillerTuiles(couche) {
+  let erreurs = 0;
+  couche.on("tileerror", () => {
+    erreurs += 1;
+    if (erreurs === 4) toast("Le fond de carte ne se charge pas. Vérifiez la connexion.");
+  });
+}
+
+function reglagesCarte() {
+  const reg = boot && boot.reglages;
+  return reg && typeof reg === "object" ? reg : {};
+}
+
+function routesProposees() {
+  return reglagesCarte().routes_actives !== false;
+}
+
+function prixPremium() {
+  const n = Number(reglagesCarte().prix_premium);
+  if (!Number.isFinite(n) || n < 0) return 1500;
+  return Math.round(n);
+}
+
+function libellePrix() {
+  const n = prixPremium();
+  if (!n) return "offert pour le moment";
+  return `${new Intl.NumberFormat("fr-FR").format(n)} F / mois`;
+}
+
+function fondInitial() {
+  const memoire = lireMemoire().fond;
+  const defaut = reglagesCarte().fond_defaut === "routes" ? "routes" : "satellite";
+  const choisi = memoire === "routes" || memoire === "satellite" ? memoire : defaut;
+  return choisi === "routes" && routesProposees() ? "routes" : choisi === "routes" ? "satellite" : choisi;
+}
+
+function appliquerFond(id) {
+  let choisi = id === "routes" ? "routes" : "satellite";
+  if (choisi === "routes" && !routesProposees()) choisi = "satellite";
+  if (!map) return;
+  if (choisi === "routes") {
+    if (map.hasLayer(fondSatellite)) map.removeLayer(fondSatellite);
+    if (map.hasLayer(fondAxes)) map.removeLayer(fondAxes);
+    if (!map.hasLayer(fondRoutes)) fondRoutes.addTo(map);
+  } else {
+    if (map.hasLayer(fondRoutes)) map.removeLayer(fondRoutes);
+    if (!map.hasLayer(fondSatellite)) fondSatellite.addTo(map);
+    if (!map.hasLayer(fondAxes)) fondAxes.addTo(map);
+  }
+  document.querySelectorAll("[data-fond]").forEach((bouton) => {
+    bouton.setAttribute("aria-pressed", bouton.dataset.fond === choisi ? "true" : "false");
+  });
+  document.body.classList.toggle("is-routes", choisi === "routes");
+  ecrireMemoire({ fond: choisi });
+}
+
 function initMap() {
   map = L.map("map", { zoomControl: false, minZoom: 11, maxZoom: 19 });
   L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -470,28 +730,58 @@ function initMap() {
   map.setMaxBounds(bounds.pad(0.2));
   map.setView([boot.centre.latitude, boot.centre.longitude], homeZoom());
 
-  // Le serveur de tuiles officiel refuse l'application (403). OSM France
-  // diffuse les mêmes données, avec l'attribution qu'il demande.
-  const tiles = L.tileLayer("https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png", {
-    subdomains: "abc",
-    maxZoom: 20,
-    crossOrigin: "anonymous",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://www.openstreetmap.fr/">OSM France</a>',
+  // Satellite Esri, et plan World Topo : rues, relief et noms de Libreville,
+  // sans clé payante. Le trafic en direct des cartes commerciales demande
+  // une clé que ce serveur n'a pas.
+  fondSatellite = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {
+      maxZoom: 19,
+      maxNativeZoom: 18,
+      attribution: 'Images © <a href="https://www.esri.com/">Esri</a>, Maxar, Earthstar Geographics',
+    },
+  );
+  fondAxes = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 19, maxNativeZoom: 18, attribution: "" },
+  );
+  fondRoutes = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    {
+      maxZoom: 19,
+      maxNativeZoom: 19,
+      attribution:
+        'Routes © <a href="https://www.esri.com/">Esri</a>, HERE, Garmin, USGS, OSM',
+    },
+  );
+  surveillerTuiles(fondSatellite);
+  surveillerTuiles(fondRoutes);
+  document.querySelectorAll('[data-fond="routes"]').forEach((bouton) => {
+    bouton.hidden = !routesProposees();
   });
-  let tileErrors = 0;
-  tiles.on("tileerror", () => {
-    tileErrors += 1;
-    if (tileErrors === 4) toast("Le fond de carte ne se charge pas. Vérifiez la connexion.");
-  });
-  tiles.addTo(map);
+  appliquerFond(fondInitial());
+  map.createPane("noms");
+  const paneNoms = map.getPane("noms");
+  paneNoms.style.zIndex = "450";
+  paneNoms.style.pointerEvents = "none";
+  nomLayer = L.layerGroup({ pane: "noms" }).addTo(map);
   markerLayer = L.layerGroup().addTo(map);
+  trajetLayer = L.layerGroup().addTo(map);
+  gpsLayer = L.layerGroup().addTo(map);
   pickLayer = L.layerGroup().addTo(map);
   map.on("click", (event) => {
     if (!state.picking) return;
     setPickedPoint(event.latlng);
   });
-  map.on("zoomend moveend", () => syncMarkers());
-  window.setTimeout(() => map.invalidateSize(), 200);
+  map.on("zoomend moveend", () => {
+    syncMarkers();
+    syncNoms();
+  });
+  syncNoms();
+  window.setTimeout(() => {
+    map.invalidateSize();
+    syncNoms();
+  }, 200);
 }
 
 function markerHtml(report) {
@@ -633,6 +923,58 @@ function syncMarkers() {
   }
 }
 
+function syncNoms() {
+  if (!nomLayer || !map || !boot) return;
+  const zoom = map.getZoom();
+  const plafond = zoom >= 15 ? 3 : zoom >= 13 ? 1 : 0;
+  const ecartCatalogue = zoom >= 15 ? 28 : zoom >= 13 ? 46 : 64;
+  const ecartExtra = zoom >= 15 ? 44 : 78;
+  const bornes = map.getBounds().pad(0.08);
+  const actifs = new Set(state.reports.map((report) => fold(report.lieu)));
+  const catalogue = boot.lieux.map((lieu) => ({
+    nom: lieu.nom,
+    latitude: lieu.latitude,
+    longitude: lieu.longitude,
+  })).sort((a, b) => {
+    const actif = (nom) => (actifs.has(fold(nom)) ? 0 : 1);
+    if (actif(a.nom) !== actif(b.nom)) return actif(a.nom) - actif(b.nom);
+    return a.nom.length - b.nom.length;
+  });
+  const extra = (window.QUARTIERS_CARTE || [])
+    .filter((lieu) => lieu.p <= plafond)
+    .filter((lieu) => !catalogue.some((item) => (
+      cleNom(item.nom) === cleNom(lieu.n)
+      || haversine(item.latitude, item.longitude, lieu.a, lieu.o) < 0.65
+    )))
+    .map((lieu) => ({ nom: lieu.n, latitude: lieu.a, longitude: lieu.o, extra: true }));
+  const poses = [];
+  nomLayer.clearLayers();
+  for (const lieu of [...catalogue, ...extra]) {
+    if (!bornes.contains([lieu.latitude, lieu.longitude])) continue;
+    const point = map.latLngToContainerPoint([lieu.latitude, lieu.longitude]);
+    const largeur = Math.max(lieu.nom.length <= 4 ? 30 : 44, lieu.nom.length * 7.2);
+    const ecart = lieu.extra ? ecartExtra : ecartCatalogue;
+    const touche = poses.some((autre) => (
+      Math.abs(autre.x - point.x) < (autre.w + largeur) / 2 + 6
+      && Math.abs(autre.y - point.y) < ecart * 0.42
+    ));
+    if (touche) continue;
+    poses.push({ x: point.x, y: point.y, w: largeur });
+    const icon = L.divIcon({
+      className: "lieu-nom",
+      html: `<span class="${zoom >= 15 ? "is-pres" : ""}">${esc(lieu.nom)}</span>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+    L.marker([lieu.latitude, lieu.longitude], {
+      icon,
+      pane: "noms",
+      interactive: false,
+      keyboard: false,
+    }).addTo(nomLayer);
+  }
+}
+
 function syncPick() {
   if (!pickLayer) return;
   pickLayer.clearLayers();
@@ -717,7 +1059,7 @@ function itemHtml(report) {
   const active = report.id === state.selectedId ? " is-active" : "";
   return `
     <button type="button" class="item${active}" data-action="open" data-id="${report.id}">
-      <span class="type-icon" style="background:${style.pin};color:${style.chipText}">${iconSvg(report.type, 20)}</span>
+      <span class="type-dot item-dot" style="background:${style.pin}"></span>
       <span class="item-body">
         <span class="item-top">
           <span class="item-title">${esc(report.lieu)}</span>
@@ -738,14 +1080,14 @@ function emptyHtml() {
     return `<div class="state"><h2>Rien pour ce filtre</h2><p>Aucun signalement de ce type vers ${esc(state.place.nom)}.</p></div>`;
   }
   if (state.place) {
-    return `<div class="state"><h2>Rien vers ${esc(state.place.nom)}</h2><p>Aucun signalement pour ce lieu en ce moment.</p><button type="button" class="btn btn-ghost" data-action="clear-place">${uiIcon("pin")} Tout Libreville</button></div>`;
+    return `<div class="state"><h2>Rien vers ${esc(state.place.nom)}</h2><p>Aucun signalement pour ce lieu en ce moment.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Voir toute la ville</button></div>`;
   }
   const liste = listeActive();
   if (state.trajet) {
-    return `<div class="state"><h2>Rien sur ce trajet</h2><p>Aucun signalement entre ${esc(nomLieu(state.trajet.depart))} et ${esc(nomLieu(state.trajet.arrivee))}.</p><button type="button" class="btn btn-ghost" data-action="clear-place">${uiIcon("pin")} Tout Libreville</button></div>`;
+    return `<div class="state"><h2>Rien sur ce trajet</h2><p>Aucun signalement entre ${esc(nomLieu(state.trajet.depart))} et ${esc(nomLieu(state.trajet.arrivee))}.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Voir toute la ville</button></div>`;
   }
   if (liste) {
-    return `<div class="state"><h2>Rien dans ${esc(liste.nom)}</h2><p>Aucun signalement pour les lieux de cette liste.</p><button type="button" class="btn btn-ghost" data-action="clear-place">${uiIcon("pin")} Tout Libreville</button></div>`;
+    return `<div class="state"><h2>Rien dans ${esc(liste.nom)}</h2><p>Aucun signalement pour les lieux de cette liste.</p><button type="button" class="btn btn-ghost" data-action="clear-place">Voir toute la ville</button></div>`;
   }
   if (state.filter !== "tous") {
     return `<div class="state"><h2>Rien pour ce filtre</h2><p>Aucun signalement de ce type pour le moment. Essayez un autre filtre, ou publiez ce que vous voyez sur la route.</p></div>`;
@@ -756,39 +1098,34 @@ function emptyHtml() {
 function renderFeed() {
   const items = visibleReports();
   const liste = listeActive();
-  const subtitle = state.trajet
-    ? `Trajet ${nomLieu(state.trajet.depart)} → ${nomLieu(state.trajet.arrivee)}`
-    : liste
-      ? `Liste ${liste.nom}`
-      : state.place
-        ? `Vers ${state.place.nom}`
-        : (state.reports.length ? `Dernier signalement ${state.reports[0].relatif}` : "Libreville");
-  const placeNote = state.trajet || liste || state.place
-    ? `<p class="sheet-place"><button type="button" data-action="clear-place">${uiIcon("pin", 14)} Tout Libreville</button></p>`
-    : "";
+  const suivi = decrireSuivi();
+  const subtitle = suivi
+    ? ""
+    : (state.reports.length ? `Dernier signalement ${state.reports[0].relatif}` : "Libreville");
   const compteLabel = state.compte && state.compte.premium ? "Premium" : "Compte";
-  const compteIcon = state.compte && state.compte.premium ? "star" : "user";
   return `
     <div class="feed-bar">
       <div class="sheet-head">
         <h1>En ce moment</h1>
         <div class="sheet-actions">
-          <button type="button" class="btn btn-ghost btn-compact" data-action="compte">${uiIcon(compteIcon)} ${compteLabel}</button>
-          <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("alarm")} Signaler</button>
+          <button type="button" class="btn btn-ghost btn-compact" data-action="compte">${compteLabel}</button>
+          <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
         </div>
-        <p>${esc(subtitle)}</p>
-        ${placeNote}
+        ${subtitle ? `<p>${esc(subtitle)}</p>` : ""}
+        ${bandeauSuivi(suivi)}
       </div>
       ${offlineNote()}
       <div class="chips" role="toolbar" aria-label="Filtrer les signalements">
-        ${FILTERS.map((chip) => {
-          const icon = chip.id === "tous" ? uiIcon("layers", 14) : iconSvg(chip.id, 14);
-          return `<button type="button" class="chip" data-action="filter" data-filter="${chip.id}" aria-pressed="${state.filter === chip.id ? "true" : "false"}">${icon}<span>${esc(chip.label)}</span></button>`;
-        }).join("")}
+        ${FILTERS.map((chip) => chipHtml(chip, `data-action="filter" data-filter="${chip.id}" aria-pressed="${state.filter === chip.id ? "true" : "false"}"`)).join("")}
       </div>
     </div>
     ${items.length ? `<div class="list">${items.map(itemHtml).join("")}</div>` : emptyHtml()}
-    <p class="footer-note">Signalements manuels, sans suivi GPS. Les autres usagers de la route signalent toute situation susceptible de créer les bouchons.</p>`;
+    ${state.reports.length >= 100 && state.filter === "tous" && !state.place && !state.trajet && !liste ? `<p class="list-cap">Les 100 signalements les plus récents. Les plus anciens quittent la liste.</p>` : ""}
+    <p class="footer-note">Signalements manuels, sans suivi GPS. Les autres usagers de la route signalent toute situation susceptible de créer les bouchons.</p>
+    <div class="legal-links">
+      <button type="button" class="btn btn-ghost" data-action="cgu">CGU</button>
+      <button type="button" class="btn btn-ghost" data-action="faq">FAQ</button>
+    </div>`;
 }
 
 function renderLoading() {
@@ -807,7 +1144,13 @@ function renderError() {
 }
 
 function noteHtml(note) {
-  return `<li class="note"><p>${esc(note.texte)}</p><span>Un conducteur · ${esc(note.relatif)}</span></li>`;
+  const qui = note.auteur || "Un usager";
+  return `<li class="note"><p>${esc(note.texte)}</p><span>${esc(qui)} · ${esc(note.relatif)}</span></li>`;
+}
+
+function commentaireAnonyme() {
+  if (state.commentAnonyme != null) return state.commentAnonyme;
+  return !!(state.compte && state.compte.anonyme);
 }
 
 function renderDetail() {
@@ -824,12 +1167,12 @@ function renderDetail() {
   const degageHint = phraseDegage(report);
   return `
     <div class="sheet-head">
-      <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("back")} Retour</button>
-      <button type="button" class="btn btn-primary btn-compact" data-action="compose">${uiIcon("alarm")} Signaler</button>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="back">Retour</button>
+      <button type="button" class="btn btn-primary btn-compact" data-action="compose">Signaler</button>
     </div>
     <article class="detail">
       <div class="detail-kicker">
-        <span class="type-pill" style="background:${style.pin};color:${style.chipText}">${iconSvg(report.type, 14)} ${esc(report.type_label)}</span>
+        <span class="detail-type"><span class="type-dot" style="background:${style.pin}"></span>${esc(report.type_label)}</span>
         <span class="muted">${esc(report.relatif)}</span>
       </div>
       <h2>${esc(report.lieu)}</h2>
@@ -846,53 +1189,159 @@ function renderDetail() {
       </div>
       <p class="appui-hint">${esc(hint)}<br><span class="degage-hint">${esc(degageHint)}</span></p>
       <section class="notes" aria-label="Précisions">
-        <h3>Précisions${notes.length ? ` <span>${notes.length}</span>` : ""}</h3>
-        ${notes.length ? `<ul class="note-list">${notes.map(noteHtml).join("")}</ul>` : '<p class="muted">Aucune précision pour l\'instant. Ajoutez ce que vous voyez sur place.</p>'}
+        <div class="notes-head">
+          <h3>Précisions</h3>
+          ${notes.length ? `<span class="notes-count">${notes.length}</span>` : ""}
+        </div>
+        ${notes.length
+          ? `<div class="note-scroll" tabindex="0"><ul class="note-list">${notes.map(noteHtml).join("")}</ul></div>${notes.length >= 30 ? `<p class="notes-cap">Les 30 précisions les plus récentes.</p>` : ""}`
+          : `<p class="notes-empty">Aucune précision pour l'instant. Ajoutez ce que vous voyez sur place.</p>`}
+        ${state.compte && state.compte.premium && state.compte.pseudo ? `
+          <label class="check comment-anonyme">
+            <input id="comment-anonyme" type="checkbox" ${commentaireAnonyme() ? "checked" : ""}>
+            <span>Commenter en anonyme</span>
+          </label>` : ""}
         <form id="comment-form" class="composer" novalidate>
           <input id="detail-commentaire" class="field${state.commentError ? " is-invalid" : ""}" type="text" maxlength="200" enterkeyhint="send" placeholder="Ajouter une précision…" value="${esc(state.detailDraft)}" ${state.commentSending ? "disabled" : ""}>
-          <button class="btn btn-primary btn-compact" type="submit" ${state.commentSending ? "disabled" : ""}>${uiIcon("send")} Envoyer</button>
+          <button class="btn btn-primary btn-compact" type="submit" ${state.commentSending ? "disabled" : ""}>Envoyer</button>
         </form>
         ${state.commentError ? `<p class="field-error">${esc(state.commentError)}</p>` : ""}
       </section>
     </article>`;
 }
 
+function phrasesDuType() {
+  return PHRASES[state.draft.type] || [];
+}
+
+function etapesSignalement() {
+  const typeOk = Boolean(state.draft.type);
+  const lieuOk = (state.draft.lieu || "").trim().length >= 2 && state.draft.latitude != null;
+  const texteOk = (state.draft.commentaire || "").trim().length >= 8;
+  return [
+    { id: "type", label: "Type", fait: typeOk },
+    { id: "lieu", label: "Lieu", fait: lieuOk },
+    { id: "phrase", label: "Phrase", fait: texteOk },
+  ];
+}
+
+function consigneSignalement() {
+  if (state.saving) return "Publication…";
+  const erreurs = validate();
+  if (erreurs.type) return "Choisissez ce que vous voyez";
+  if (erreurs.lieu) {
+    const { connus, ajouter } = propositionsLieu(state.draft.lieu);
+    if (ajouter && !connus.length) return "Placez le nouveau quartier sur la carte";
+    if ((state.draft.lieu || "").trim()) return "Choisissez un quartier, ou ajoutez-le";
+    return "Indiquez le quartier";
+  }
+  if (erreurs.commentaire) return "Gardez la phrase, ou écrivez la vôtre";
+  if ((state.draft.lieu || "").trim() && !state.draft.lieuId) return "Ce quartier sera ajouté à la liste";
+  return "Prêt";
+}
+
+function propositionsLieu(requete) {
+  const texte = String(requete || "").trim();
+  const q = fold(texte);
+  if (!q) return { connus: [], ajouter: false };
+  const connus = boot.lieux.filter((lieu) => fold(lieu.nom).includes(q)).slice(0, 6);
+  const exact = boot.lieux.some((lieu) => fold(lieu.nom) === q);
+  return { connus, ajouter: texte.length >= 2 && !exact && !texte.startsWith("Près de ") };
+}
+
+function htmlPropositions() {
+  const { connus, ajouter } = propositionsLieu(state.draft.lieu || "");
+  if (!state.lieuOuvert || (!connus.length && !ajouter)) return `<ul id="lieux-connus" class="lieu-propositions" hidden></ul>`;
+  const items = connus.map((lieu) => (
+    `<li><button type="button" class="lieu-hit${state.draft.lieuId === lieu.id ? " is-on" : ""}" data-action="lieu-rapide" data-lieu="${esc(lieu.id)}">${esc(lieu.nom)}</button></li>`
+  )).join("");
+  const ajout = ajouter
+    ? `<li><button type="button" class="lieu-hit is-add" data-action="lieu-nouveau">Ajouter « ${esc((state.draft.lieu || "").trim())} »</button></li>`
+    : "";
+  return `<ul id="lieux-connus" class="lieu-propositions" role="listbox">${items}${ajout}</ul>`;
+}
+
+function peindreLieux() {
+  const liste = document.getElementById("lieux-connus");
+  if (!liste) return;
+  const enveloppe = document.createElement("div");
+  enveloppe.innerHTML = htmlPropositions();
+  liste.replaceWith(enveloppe.firstElementChild);
+}
+
+function memoriserLieu(lieu) {
+  if (!lieu || !lieu.id || !lieu.nom) return;
+  const index = boot.lieux.findIndex((item) => item.id === lieu.id || fold(item.nom) === fold(lieu.nom));
+  if (index === -1) boot.lieux.push(lieu);
+  else boot.lieux[index] = { ...boot.lieux[index], ...lieu };
+  boot.lieux.sort((a, b) => (fold(a.nom) < fold(b.nom) ? -1 : 1));
+  syncNoms();
+}
+
+function htmlTypes() {
+  const choisi = boot.types.find((type) => type.id === state.draft.type);
+  if (choisi && !state.typesOuverts) {
+    return `<button type="button" class="type-actuel" data-action="types" aria-expanded="false">${iconeType(choisi.id, false)}<span>${esc(choisi.label)}</span><span class="type-changer">Changer</span></button>`;
+  }
+  return `<div class="type-grid" role="group" aria-label="Type d'incident">
+        ${boot.types.map((type) => {
+          const pressed = state.draft.type === type.id;
+          return `<button type="button" class="type-option" data-action="type" data-type="${type.id}" aria-pressed="${pressed ? "true" : "false"}">${iconeType(type.id, pressed)}<span>${esc(type.label)}</span></button>`;
+        }).join("")}
+      </div>`;
+}
+
 function renderCompose() {
   const text = state.draft.commentaire || "";
+  const etapes = etapesSignalement();
+  const courant = etapes.find((etape) => !etape.fait);
+  const pret = !courant;
+  const phrases = phrasesDuType();
+  const place = state.draft.latitude != null
+    ? `<button type="button" class="btn-text pick-link" data-action="pick">Déplacer le point</button>`
+    : `<button type="button" class="btn btn-ghost btn-block pick-btn${(state.draft.lieu || "").trim() ? " is-needed" : ""}" data-action="pick">Placer sur la carte</button>`;
+  const suite = state.draft.type ? `
+      <label class="field-label" for="lieu-saisie">Quartier</label>
+      <div class="lieu-cherche" id="lieu-cherche">
+        <input id="lieu-saisie" class="field${state.errors.lieu ? " is-invalid" : ""}" maxlength="120" autocomplete="off" enterkeyhint="search" placeholder="Rechercher ou ajouter un quartier" value="${esc(state.draft.lieu)}" role="combobox" aria-autocomplete="list" aria-controls="lieux-connus" aria-expanded="${state.lieuOuvert ? "true" : "false"}">
+        ${htmlPropositions()}
+      </div>
+      <p class="chosen${state.draft.latitude != null ? " is-set" : ""}"${lieuAide() ? "" : " hidden"}>${esc(lieuAide())}</p>
+      ${state.errors.lieu ? `<p class="field-error" id="lieu-erreur">${esc(state.errors.lieu)}</p>` : ""}
+      ${place}
+      <p class="field-label">Phrase</p>
+      <div class="phrase-row" role="group" aria-label="Phrases rapides">
+        ${phrases.map((phrase, index) => `<button type="button" class="phrase" data-action="phrase" data-index="${index}" aria-pressed="${text.trim() === phrase ? "true" : "false"}">${esc(phrase)}</button>`).join("")}
+      </div>
+      <label class="sr-only" for="commentaire">Modifier la phrase</label>
+      <textarea id="commentaire" class="field${state.errors.commentaire ? " is-invalid" : ""}" maxlength="280" rows="2" placeholder="Ou écrivez ce que vous voyez.">${esc(text)}</textarea>
+      <div class="field-meta">
+        <span>${state.errors.commentaire ? `<span class="field-error">${esc(state.errors.commentaire)}</span>` : "Pas de nom, pas de numéro."}</span>
+        <span id="commentaire-count">${text.trim().length}/280</span>
+      </div>` : "";
   return `
+    <div class="compose-scroll">
     <div class="sheet-head">
       <div>
-        <h1>Nouveau signalement</h1>
-        <p>Visible tout de suite par les autres conducteurs.</p>
+        <h1>Signaler</h1>
+        <p>Un type, un lieu, une phrase.</p>
       </div>
-      <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("close")} Fermer</button>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="back">Fermer</button>
     </div>
     <form id="compose-form" class="compose" novalidate>
-      <p class="field-label">${uiIcon("layers", 14)} Type d'incident</p>
-      <div class="type-grid">
-        ${boot.types.map((type) => {
-          const style = styleOf(type.id);
-          const pressed = state.draft.type === type.id;
-          return `<button type="button" class="type-option" data-action="type" data-type="${type.id}" aria-pressed="${pressed ? "true" : "false"}"><span class="type-icon" style="background:${style.pin};color:${style.chipText}">${iconSvg(type.id)}</span><span>${esc(type.label)}</span></button>`;
-        }).join("")}
-      </div>
+      <ol class="compose-steps" aria-label="Étapes">
+        ${etapes.map((etape) => `<li class="${etape.fait ? "is-done" : courant && courant.id === etape.id ? "is-current" : ""}">${esc(etape.label)}</li>`).join("")}
+      </ol>
+      ${htmlTypes()}
       ${state.errors.type ? `<p class="field-error">${esc(state.errors.type)}</p>` : ""}
-      <label class="field-label" for="commentaire">${uiIcon("list", 14)} Que se passe-t-il ?</label>
-      <textarea id="commentaire" class="field${state.errors.commentaire ? " is-invalid" : ""}" maxlength="280" placeholder="Ex. Deux files vers le marché, ça n'avance plus depuis le feu.">${esc(text)}</textarea>
-      <div class="field-meta">
-        <span>${state.errors.commentaire ? `<span class="field-error">${esc(state.errors.commentaire)}</span>` : "Une phrase suffit. Pas de nom, pas de numéro."}</span>
-        <span id="commentaire-count">${text.trim().length}/280</span>
-      </div>
-      <label class="field-label" for="lieu-saisie">${uiIcon("pin", 14)} Lieu approximatif</label>
-      <input id="lieu-saisie" class="field${state.errors.lieu ? " is-invalid" : ""}" list="lieux-connus" maxlength="120" autocomplete="off" enterkeyhint="done" placeholder="Quartier de la liste, ou le vôtre" value="${esc(state.draft.lieu)}">
-      <datalist id="lieux-connus">
-        ${boot.lieux.map((lieu) => `<option value="${esc(lieu.nom)}"></option>`).join("")}
-      </datalist>
-      <button type="button" class="btn btn-ghost btn-block pick-btn" data-action="pick">${uiIcon("pin")} Choisir sur la carte</button>
-      <p class="chosen${state.draft.latitude != null ? " is-set" : ""}">${esc(lieuAide())}</p>
-      ${state.errors.lieu ? `<p class="field-error" id="lieu-erreur">${esc(state.errors.lieu)}</p>` : ""}
-      <button class="btn btn-primary btn-block" type="submit" ${state.saving ? "disabled" : ""}>${uiIcon("send")} ${state.saving ? "Publication…" : "Publier le signalement"}</button>
-    </form>`;
+      ${suite}
+    </form>
+    </div>
+    <div class="compose-dock">
+      <p id="compose-status" class="compose-status${pret ? " is-ready" : ""}">${esc(consigneSignalement())}</p>
+      <button class="btn btn-primary btn-block" type="submit" form="compose-form" ${state.saving ? "disabled" : ""}>${state.saving ? "Publication…" : "Publier"}</button>
+      <p class="compose-legal">Situation réelle seulement. <button type="button" class="btn-text" data-action="cgu">CGU</button> · <button type="button" class="btn-text" data-action="faq">FAQ</button></p>
+    </div>`;
 }
 
 function nomLieu(id) {
@@ -919,7 +1368,14 @@ function dansLesHeures() {
   return couvre(reglages.debut, reglages.fin) || couvre(reglages.debut2, reglages.fin2);
 }
 
+function typeSurveille(report) {
+  const types = assurerReglages().types;
+  if (!Array.isArray(types) || !types.length) return true;
+  return types.includes(report.type);
+}
+
 function correspondVeille(report) {
+  if (!typeSurveille(report)) return false;
   if (state.trajet) return reportMatchesTrajet(report);
   if (state.listeId) return reportMatchesListe(report);
   return false;
@@ -945,6 +1401,8 @@ function bip() {
 function alerter(phrase) {
   const reglages = assurerReglages();
   if (!dansLesHeures()) return;
+  state.veille = phrase;
+  peindreVeille();
   if (reglages.visuel !== false) {
     toast(phrase);
     if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
@@ -954,105 +1412,543 @@ function alerter(phrase) {
   if (reglages.son) bip();
 }
 
-function renderCompte() {
-  if (!state.compte) {
-    return `
-      <div class="sheet-head">
-        <div><h1>Compte</h1><p>Pour suivre des lieux. La carte reste ouverte sans compte.</p></div>
-        <button type="button" class="btn btn-ghost btn-compact" data-action="back">${uiIcon("close")} Fermer</button>
-      </div>
-      <form id="compte-form" class="compose" novalidate>
-        <label class="field-label" for="compte-email">${uiIcon("mail", 14)} Email</label>
-        <input id="compte-email" class="field" type="email" autocomplete="username" inputmode="email" required value="${esc(state.compteEmail)}">
-        <label class="field-label" for="compte-mot">${uiIcon("lock", 14)} Mot de passe</label>
-        <input id="compte-mot" class="field" type="password" autocomplete="current-password" minlength="8" required>
-        ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
-        <div class="sheet-actions compte-actions">
-          <button class="btn btn-primary" type="button" data-action="connexion" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("user")} Se connecter</button>
-          <button class="btn btn-ghost" type="button" data-action="inscription" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("plus")} Créer un compte</button>
-        </div>
-      </form>`;
+function peindreVeille() {
+  const el = document.getElementById("veille");
+  if (!el) return;
+  if (!state.veille) {
+    el.hidden = true;
+    el.innerHTML = "";
+    return;
   }
+  el.hidden = false;
+  el.innerHTML = `<p>${esc(state.veille)}</p><button type="button" id="veille-fermer">Fermer</button>`;
+  const fermer = document.getElementById("veille-fermer");
+  if (fermer) fermer.addEventListener("click", () => {
+    state.veille = "";
+    peindreVeille();
+  });
+}
+
+function syncTrajet() {
+  if (!trajetLayer) return;
+  trajetLayer.clearLayers();
+  if (!state.trajet || !state.compte || !state.compte.premium) return;
+  const depart = lieuParId(state.trajet.depart);
+  const arrivee = lieuParId(state.trajet.arrivee);
+  if (!depart || !arrivee) return;
+  const trace = [[depart.latitude, depart.longitude], [arrivee.latitude, arrivee.longitude]];
+  const sombre = document.body.classList.contains("is-routes");
+  L.polyline(trace, { color: sombre ? "#171717" : "#ffffff", weight: 7, opacity: 0.9 }).addTo(trajetLayer);
+  L.polyline(trace, { color: sombre ? "#ffffff" : "#171717", weight: 2, opacity: 0.95, dashArray: "10 8" }).addTo(trajetLayer);
+}
+
+function champLieu(nomChamp, choisi, label) {
+  const lieu = choisi ? lieuParId(choisi) : null;
+  return `
+    <div class="pick champ">
+      <span>${esc(label)}</span>
+      <input class="field pick-input" type="text" autocomplete="off" placeholder="Rechercher un quartier" aria-label="${esc(label)}" value="${lieu ? esc(lieu.nom) : ""}">
+      <input type="hidden" name="${esc(nomChamp)}" value="${esc(choisi || "")}">
+      <ul class="lieu-propositions pick-resultats" hidden></ul>
+    </div>`;
+}
+
+function peindrePick(input) {
+  const pick = input.closest(".pick");
+  if (!pick) return;
+  const liste = pick.querySelector(".pick-resultats");
+  const hidden = pick.querySelector('input[type="hidden"]');
+  document.querySelectorAll(".pick-resultats").forEach((autre) => {
+    if (autre !== liste) {
+      autre.hidden = true;
+    }
+  });
+  const q = fold(input.value.trim());
+  const exact = q ? boot.lieux.find((lieu) => fold(lieu.nom) === q) : null;
+  hidden.value = exact ? exact.id : "";
+  if (q.length < 1) {
+    liste.hidden = true;
+    liste.innerHTML = "";
+    return;
+  }
+  const hits = boot.lieux.filter((lieu) => fold(lieu.nom).includes(q)).slice(0, 8);
+  liste.hidden = false;
+  liste.innerHTML = hits.length
+    ? hits.map((lieu) => `<li><button type="button" class="lieu-hit" data-action="choisir-lieu" data-id="${esc(lieu.id)}" data-nom="${esc(lieu.nom)}">${esc(lieu.nom)}</button></li>`).join("")
+    : `<li class="lieu-vide">Aucun quartier sous ce nom.</li>`;
+}
+
+function choisirLieuPick(el) {
+  const pick = el.closest(".pick");
+  if (!pick) return;
+  const input = pick.querySelector(".pick-input");
+  const hidden = pick.querySelector('input[type="hidden"]');
+  input.value = el.dataset.nom || "";
+  hidden.value = el.dataset.id || "";
+  const liste = pick.querySelector(".pick-resultats");
+  liste.hidden = true;
+  liste.innerHTML = "";
+}
+
+function incidentsCouloir(departId, arriveeId) {
+  const depart = lieuParId(departId);
+  const arrivee = lieuParId(arriveeId);
+  if (!depart || !arrivee) return [];
+  return state.reports.filter((report) => (
+    encoreValide(report)
+    && report.latitude != null
+    && distanceSegmentKm(report.latitude, report.longitude, depart, arrivee) <= 1.5
+  ));
+}
+
+function decrireSuivi() {
+  const liste = listeActive();
+  if (state.trajet) {
+    const domicile = state.compte && state.compte.domicile_id;
+    const travail = state.compte && state.compte.travail_id;
+    const maison = domicile && travail && state.trajet.depart === domicile && state.trajet.arrivee === travail;
+    return {
+      kicker: maison ? "Trajet habituel" : "Trajet en cours",
+      titre: `${nomLieu(state.trajet.depart)} → ${nomLieu(state.trajet.arrivee)}`,
+      detail: "La carte est limitée à ce chemin.",
+    };
+  }
+  if (liste) {
+    const n = (liste.lieux || []).length;
+    return {
+      kicker: "Liste en cours",
+      titre: liste.nom,
+      detail: n ? `${n} quartier${n > 1 ? "s" : ""} sur la carte.` : "Ajoutez un quartier pour filtrer la carte.",
+    };
+  }
+  if (state.place) {
+    return {
+      kicker: "Lieu affiché",
+      titre: state.place.nom,
+      detail: "La liste ne montre que ce lieu.",
+    };
+  }
+  return null;
+}
+
+function bandeauSuivi(suivi) {
+  if (!suivi) return "";
+  return `
+    <div class="en-cours is-on suivi-bandeau">
+      <div>
+        <span>${esc(suivi.kicker)}</span>
+        <strong>${esc(suivi.titre)}</strong>
+      </div>
+      <button type="button" data-action="clear-place">Toute la ville</button>
+    </div>`;
+}
+
+function carteEnCours() {
+  const suivi = decrireSuivi();
+  if (!suivi) {
+    return `
+      <section class="en-cours">
+        <div>
+          <span>En cours</span>
+          <strong>Toute la ville</strong>
+          <em>Aucun trajet ni liste. La carte montre Libreville.</em>
+        </div>
+      </section>`;
+  }
+  return `
+    <section class="en-cours is-on">
+      <div>
+        <span>${esc(suivi.kicker)}</span>
+        <strong>${esc(suivi.titre)}</strong>
+        <em>${esc(suivi.detail || "")}</em>
+      </div>
+      <button type="button" data-action="clear-place">Arrêter</button>
+    </section>`;
+}
+
+function interrupteur(nom, on, label, hint) {
+  return `
+    <label class="switch">
+      <span class="switch-copy"><strong>${esc(label)}</strong>${hint ? `<small>${esc(hint)}</small>` : ""}</span>
+      <input type="checkbox" data-reglage="${esc(nom)}" ${on ? "checked" : ""}>
+      <span class="switch-ui" aria-hidden="true"></span>
+    </label>`;
+}
+
+function resumeTypes() {
+  const choisis = assurerReglages().types;
+  if (!Array.isArray(choisis) || !choisis.length) return "Tous les types.";
+  return FILTERS.filter((chip) => chip.id !== "tous" && choisis.includes(chip.id)).map((chip) => chip.label).join(" · ");
+}
+
+function briefingHtml() {
+  const domicile = state.compte.domicile_id || "";
+  const travail = state.compte.travail_id || "";
+  const distincts = domicile && travail && domicile !== travail;
+  const incidents = distincts ? incidentsCouloir(domicile, travail) : [];
+  const lignes = incidents.slice(0, 3).map((report) => (
+    `<button type="button" class="briefing-hit" data-action="open" data-id="${report.id}"><strong>${esc(report.lieu)}</strong><span>${esc(report.type_label)} · ${esc(report.relatif)}</span></button>`
+  )).join("");
+  let resume = "Choisissez le domicile et le travail, puis suivez le trajet.";
+  if (domicile && travail && domicile === travail) resume = "Choisissez deux lieux différents.";
+  else if (distincts && incidents.length) resume = `${incidents.length} incident${incidents.length > 1 ? "s" : ""} sur ce chemin.`;
+  else if (distincts) resume = "Rien sur ce chemin pour l'instant.";
+  return `
+    <form id="domicile-form" class="trajet-simple">
+      ${champLieu("domicile", domicile, "Domicile")}
+      ${champLieu("travail", travail, "Travail")}
+      <button class="btn btn-primary btn-block" type="button" data-action="suivre-domicile">Suivre ce trajet</button>
+    </form>
+    <p class="briefing-compte">${esc(resume)}</p>
+    ${lignes ? `<div class="briefing-list">${lignes}</div>` : ""}`;
+}
+
+function trajetAutreHtml() {
+  const domicile = state.compte.domicile_id || "";
+  const travail = state.compte.travail_id || "";
+  const autreActif = !!(state.trajet && !(domicile && travail && state.trajet.depart === domicile && state.trajet.arrivee === travail));
+  const ouvert = state.autreTrajet || autreActif;
+  const depart = autreActif ? state.trajet.depart : "";
+  const arrivee = autreActif ? state.trajet.arrivee : "";
+  return `
+    <button type="button" class="btn-text suite-lien" data-action="autre-trajet">${ouvert ? "Masquer l’autre trajet" : "Suivre un autre trajet"}</button>
+    ${ouvert ? `
+      <form id="trajet-form" class="trajet-simple">
+        ${champLieu("depart", depart, "Départ")}
+        ${champLieu("arrivee", arrivee, "Arrivée")}
+        <button class="btn btn-primary btn-block" type="submit">${autreActif ? "Mettre à jour" : "Suivre cet autre trajet"}</button>
+      </form>` : ""}`;
+}
+
+function typesVeilleHtml() {
+  const choisis = assurerReglages().types;
+  const tous = !Array.isArray(choisis) || !choisis.length;
+  return FILTERS.filter((chip) => chip.id !== "tous").map((chip) => {
+    const on = tous || choisis.includes(chip.id);
+    return chipHtml(chip, `data-action="type-veille" data-type="${chip.id}" aria-pressed="${on ? "true" : "false"}"`);
+  }).join("");
+}
+
+function silenceLibelle() {
+  const jusqua = assurerReglages().silenceJusqua;
+  if (jusqua && Date.now() < jusqua) {
+    const heure = new Date(jusqua).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return `Silence jusqu’à ${heure}`;
+  }
+  return "Silence pendant 2 heures";
+}
+
+function enteteCompte(titre, sousTitre) {
+  return `
+    <div class="sheet-head">
+      <div><h1>${titre}</h1><p>${sousTitre}</p></div>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="back">Fermer</button>
+    </div>`;
+}
+
+function lienCourriel() {
+  if (!state.compteLien) return "";
+  const libelle = state.compteMode === "nouveau" ? "Choisir un mot de passe" : "Ouvrir le lien reçu";
+  return `
+    <a class="btn btn-primary btn-block" href="${esc(state.compteLien)}">${libelle}</a>
+    <p class="muted auth-note">Le lien est affiché ici le temps que l'envoi d'emails soit branché sur ce serveur.</p>`;
+}
+
+function renderCompteInvite() {
+  const mode = state.compteMode;
+  if (mode === "attente") {
+    return `
+      ${enteteCompte("Compte", "Confirmez votre adresse.")}
+      <form id="compte-form" class="auth" novalidate>
+        <p>${esc(state.compteMessage || "Un message part vers votre adresse. Ouvrez-le pour activer le compte.")}</p>
+        ${lienCourriel()}
+        <button class="btn btn-ghost btn-block" type="submit" ${state.compteEnCours ? "disabled" : ""}>Renvoyer le message</button>
+        <button type="button" class="btn-text auth-lien" data-action="auth-mode" data-mode="connexion">Retour à la connexion</button>
+        ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
+      </form>
+      ${carteInfos()}`;
+  }
+  if (mode === "oubli") {
+    return `
+      ${enteteCompte("Compte", "Recevoir un lien pour choisir un nouveau mot de passe.")}
+      <form id="compte-form" class="auth" novalidate>
+        <label class="auth-field" for="compte-email"><span>Email</span></label>
+        <input id="compte-email" class="field" type="email" autocomplete="username" inputmode="email" required value="${esc(state.compteEmail)}" placeholder="vous@email.com">
+        ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
+        <button class="btn btn-primary btn-block" type="submit" ${state.compteEnCours ? "disabled" : ""}>${state.compteEnCours ? "Un instant…" : "Envoyer le lien"}</button>
+        ${lienCourriel()}
+        <button type="button" class="btn-text auth-lien" data-action="auth-mode" data-mode="connexion">Retour à la connexion</button>
+      </form>
+      ${carteInfos()}`;
+  }
+  if (mode === "nouveau") {
+    return `
+      ${enteteCompte("Compte", "Choisissez un nouveau mot de passe.")}
+      <form id="compte-form" class="auth" novalidate>
+        <label class="auth-field" for="compte-mot"><span>Nouveau mot de passe</span></label>
+        <input id="compte-mot" class="field" type="password" autocomplete="new-password" minlength="8" required placeholder="8 caractères minimum">
+        ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
+        <button class="btn btn-primary btn-block" type="submit" ${state.compteEnCours ? "disabled" : ""}>${state.compteEnCours ? "Un instant…" : "Enregistrer"}</button>
+      </form>
+      ${carteInfos()}`;
+  }
+  const inscription = mode === "inscription";
+  return `
+    ${enteteCompte("Compte", "La carte reste ouverte sans compte.")}
+    <form id="compte-form" class="auth" novalidate>
+      <div class="auth-switch" role="tablist" aria-label="Connexion ou inscription">
+        <button type="button" role="tab" data-action="auth-mode" data-mode="connexion" aria-selected="${inscription ? "false" : "true"}">Connexion</button>
+        <button type="button" role="tab" data-action="auth-mode" data-mode="inscription" aria-selected="${inscription ? "true" : "false"}">Inscription</button>
+      </div>
+      <label class="auth-field" for="compte-email"><span>Email</span></label>
+      <input id="compte-email" class="field" type="email" autocomplete="username" inputmode="email" required value="${esc(state.compteEmail)}" placeholder="vous@email.com">
+      ${inscription ? `
+        <label class="auth-field" for="compte-pseudo"><span>Pseudo</span></label>
+        <input id="compte-pseudo" class="field" type="text" maxlength="20" autocomplete="nickname" required value="${esc(state.comptePseudo || "")}" placeholder="Visible avec Premium">` : ""}
+      <label class="auth-field" for="compte-mot"><span>Mot de passe</span></label>
+      <input id="compte-mot" class="field" type="password" autocomplete="${inscription ? "new-password" : "current-password"}" minlength="8" required placeholder="8 caractères minimum">
+      ${inscription ? `
+        <label class="auth-cgu">
+          <input id="compte-cgu" type="checkbox" ${state.compteCgu ? "checked" : ""}>
+          <span>J’accepte les conditions d’utilisation.</span>
+        </label>` : `<button type="button" class="btn-text auth-lien" data-action="auth-mode" data-mode="oubli">Mot de passe oublié</button>`}
+      <button type="button" class="btn-text auth-lien" data-action="cgu">Lire les CGU</button>
+      ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
+      <button class="btn btn-primary btn-block" type="submit" ${state.compteEnCours ? "disabled" : ""}>${state.compteEnCours ? "Un instant…" : inscription ? "Créer le compte" : "Se connecter"}</button>
+    </form>
+    ${carteInfos()}`;
+}
+
+function panneauVeille(listesHtml) {
+  return `
+    <section class="bloc">
+      <h2 class="bloc-titre">Trajet habituel</h2>
+      ${briefingHtml()}
+      ${trajetAutreHtml()}
+    </section>
+    <section class="bloc">
+      <h2 class="bloc-titre">Listes</h2>
+      <form id="nouvelle-liste" class="champ-ligne">
+        <input class="field" name="nom" maxlength="40" placeholder="Nouvelle liste, ex. Matin" aria-label="Nom de la liste">
+        <button class="btn btn-primary btn-compact" type="submit">Créer</button>
+      </form>
+      ${listesHtml}
+    </section>`;
+}
+
+function panneauAlertes(reglages) {
+  const silence = reglages.silenceJusqua && Date.now() < reglages.silenceJusqua;
+  return `
+    <section class="bloc">
+      <h2 class="bloc-titre">Sur la route</h2>
+      <div class="reglages-carte">
+        ${interrupteur("visuel", reglages.visuel, "Sur l’écran")}
+        ${interrupteur("son", reglages.son, "Son")}
+        ${interrupteur("gps", reglages.gps, "Position GPS", "Point sur la carte, alerte à l’approche")}
+        ${reglages.gps ? `<p class="gps-etat" id="gps-etat">${esc(state.gpsEtat || "Position en attente.")}</p>` : ""}
+        ${interrupteur("conduite", reglages.conduite, "Mode conduite", "Texte plus grand")}
+      </div>
+    </section>
+    <section class="bloc">
+      <h2 class="bloc-titre">Types d’alerte</h2>
+      <p class="bloc-note">${esc(resumeTypes())}</p>
+      <div class="chips" aria-label="Types qui déclenchent une alerte">${typesVeilleHtml()}</div>
+    </section>
+    <section class="bloc">
+      <h2 class="bloc-titre">Quand</h2>
+      <div class="reglages-carte">
+        ${interrupteur("heures", reglages.heures, "Heures de vigilance", "Matin et soir seulement")}
+        ${reglages.heures ? `
+          <div class="heures-bloc">
+            <label class="champ"><span>Matin</span><span class="heures-ligne"><input class="field" type="time" data-heure="debut" aria-label="Début du matin" value="${esc(reglages.debut)}"><input class="field" type="time" data-heure="fin" aria-label="Fin du matin" value="${esc(reglages.fin)}"></span></label>
+            <label class="champ"><span>Soir</span><span class="heures-ligne"><input class="field" type="time" data-heure="debut2" aria-label="Début du soir" value="${esc(reglages.debut2)}"><input class="field" type="time" data-heure="fin2" aria-label="Fin du soir" value="${esc(reglages.fin2)}"></span></label>
+          </div>` : ""}
+        <button type="button" class="silence-row" data-action="silence">
+          <span><strong>${silence ? esc(silenceLibelle()) : "Silence"}</strong><small>${silence ? "Les alertes sont coupées." : "Deux heures sans alerte."}</small></span>
+          <em>${silence ? "Reprendre" : "2 h"}</em>
+        </button>
+      </div>
+    </section>`;
+}
+
+function panneauProfil() {
+  const pseudo = state.compte.pseudo || "";
+  return `
+    <section class="bloc">
+      <h2 class="bloc-titre">Signature</h2>
+      <form id="pseudo-form" class="champ-ligne">
+        <label class="champ">
+          <span>Pseudo</span>
+          <input class="field" name="pseudo" maxlength="20" placeholder="Votre pseudo" aria-label="Pseudo" value="${esc(pseudo)}">
+        </label>
+        <button class="btn btn-primary btn-compact" type="submit">OK</button>
+      </form>
+      <div class="reglages-carte">
+        <label class="switch">
+          <span class="switch-copy"><strong>Anonyme</strong><small>${pseudo ? `Sinon, les précisions portent ${esc(pseudo)}.` : "Les précisions restent signées « Un usager »."}</small></span>
+          <input type="checkbox" id="anonyme-defaut" ${state.compte.anonyme ? "checked" : ""}>
+          <span class="switch-ui" aria-hidden="true"></span>
+        </label>
+      </div>
+    </section>
+    <p class="liens-calmes">
+      <button type="button" class="btn-text" data-action="cgu">CGU</button>
+      <button type="button" class="btn-text" data-action="faq">FAQ</button>
+    </p>
+    <button type="button" class="btn btn-ghost btn-block" data-action="sortie">${uiIcon("logout")} Se déconnecter</button>`;
+}
+
+function renderCompte() {
+  if (!state.compte) return renderCompteInvite();
   const premium = state.compte.premium;
   const listes = state.compte.listes || [];
   const reglages = assurerReglages();
-  const options = boot.lieux.map((lieu) => `<option value="${esc(lieu.id)}">${esc(lieu.nom)}</option>`).join("");
-  const listesHtml = listes.map((liste) => `
-    <article class="liste${state.listeId === liste.id ? " is-on" : ""}">
+  const panneau = state.comptePanneau || "veille";
+  const listesHtml = listes.map((liste) => {
+    const on = state.listeId === liste.id;
+    const lieux = liste.lieux || [];
+    return `
+    <article class="liste${on ? " is-on" : ""}">
       <header>
-        <h3>${esc(liste.nom)}</h3>
-        <button type="button" class="btn btn-ghost btn-compact" data-action="suivre-liste" data-id="${liste.id}">${uiIcon(state.listeId === liste.id ? "check" : "pin")} ${state.listeId === liste.id ? "Suivie" : "Suivre"}</button>
+        <div>
+          <h3>${esc(liste.nom)}</h3>
+          ${on ? `<span class="pill-cours">En cours</span>` : `<p>${lieux.length ? `${lieux.length} quartier${lieux.length > 1 ? "s" : ""}` : "Liste vide"}</p>`}
+        </div>
+        <button type="button" class="btn ${on ? "btn-ghost" : "btn-primary"} btn-compact" data-action="suivre-liste" data-id="${liste.id}">${on ? "Arrêter" : "Suivre"}</button>
       </header>
-      <div class="liste-lieux">
-        ${(liste.lieux || []).map((id) => `<button type="button" class="chip" data-action="retirer-lieu" data-liste="${liste.id}" data-lieu="${esc(id)}">${esc(nomLieu(id))} ×</button>`).join("") || '<p class="muted">Aucun lieu pour l’instant.</p>'}
-      </div>
+      ${lieux.length ? `<div class="liste-lieux">${lieux.map((id) => `<button type="button" class="chip" data-action="retirer-lieu" data-liste="${liste.id}" data-lieu="${esc(id)}">${esc(nomLieu(id))} ×</button>`).join("")}</div>` : ""}
       <form class="liste-ajout" data-liste="${liste.id}">
-        <select class="field" name="lieu_id" aria-label="Ajouter un lieu à ${esc(liste.nom)}">${options}</select>
-        <button class="btn btn-ghost btn-compact" type="submit">${uiIcon("plus")} Ajouter</button>
-        <button type="button" class="btn btn-ghost btn-compact" data-action="supprimer-liste" data-id="${liste.id}">${uiIcon("trash")} Supprimer</button>
+        <div class="pick">
+          <input class="field pick-input" type="text" autocomplete="off" placeholder="Ajouter un quartier" aria-label="Ajouter un quartier à ${esc(liste.nom)}">
+          <input type="hidden" name="lieu_id" value="">
+          <ul class="lieu-propositions pick-resultats" hidden></ul>
+        </div>
+        <button class="btn btn-ghost btn-compact" type="submit">Ajouter</button>
       </form>
-    </article>`).join("");
+      <button type="button" class="btn-text danger-lien" data-action="supprimer-liste" data-id="${liste.id}">Supprimer</button>
+    </article>`;
+  }).join("");
+  const onglet = (id, label) => `<button type="button" role="tab" data-action="compte-panneau" data-panneau="${id}" aria-selected="${panneau === id ? "true" : "false"}">${label}</button>`;
   return `
     <div class="sheet-head">
       <div>
         <h1>${premium ? "Premium" : "Compte"}</h1>
         <p>${esc(state.compte.email)}</p>
       </div>
-      <button type="button" class="btn btn-ghost btn-compact" data-action="sortie">${uiIcon("logout")} Sortir</button>
+      <button type="button" class="btn btn-ghost btn-compact" data-action="back">Fermer</button>
     </div>
+    ${premium ? carteEnCours() : ""}
+    ${premium ? `<div class="segments" role="tablist" aria-label="Réglages Premium">${onglet("veille", "Veille")}${onglet("alertes", "Alertes")}${onglet("profil", "Profil")}</div>` : ""}
     <div class="compose">
       ${premium ? "" : `
         <section class="offre">
-          <h2>Personnaliser, 1 500 F / mois</h2>
+          <h2>Personnaliser, ${esc(libellePrix())}</h2>
           <ul>
+            <li>Briefing du trajet domicile–travail, incidents sur le chemin</li>
             <li>Listes de quartiers à suivre</li>
-            <li>Trajet domicile–travail, signalements sur le chemin</li>
-            <li>Alertes visuelles et sonores</li>
-            <li>GPS : alerte quand vous approchez d’un lieu suivi</li>
+            <li>Alertes visuelles et sonores, filtrées par type</li>
+            <li>GPS : position sur la carte et alerte à l’approche</li>
             <li>Heures de vigilance, le matin et le soir</li>
             <li>Mode conduite, texte plus grand</li>
             <li>Silence de deux heures</li>
+            <li>Pseudo signé sur les précisions, ou commentaire anonyme</li>
           </ul>
           <p class="muted">Le paiement mobile money n’est pas branché. Activer Premium ici enregistre le droit sur ce serveur, sans débit.</p>
           ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
           <button type="button" class="btn btn-primary btn-block" data-action="premium" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("star")} Activer Premium</button>
-        </section>`}
-      ${premium ? `
-        <section>
-          <h2 class="field-label">${uiIcon("list", 14)} Listes de lieux</h2>
-          ${listesHtml || '<p class="muted">Créez une liste, par exemple Matin ou Famille.</p>'}
-          <form id="nouvelle-liste" class="liste-ajout">
-            <input class="field" name="nom" maxlength="40" placeholder="Nom de la liste" aria-label="Nom de la liste">
-            <button class="btn btn-primary btn-compact" type="submit">${uiIcon("plus")} Créer</button>
-          </form>
         </section>
-        <section>
-          <h2 class="field-label">${uiIcon("route", 14)} Trajet</h2>
-          <form id="trajet-form" class="trajet">
-            <select class="field" name="depart" aria-label="Départ">${options}</select>
-            <select class="field" name="arrivee" aria-label="Arrivée">${options}</select>
-            <button class="btn btn-primary btn-compact" type="submit">${uiIcon("route")} ${state.trajet ? "Trajet suivi" : "Suivre ce trajet"}</button>
-            ${state.trajet ? `<button type="button" class="btn btn-ghost btn-compact" data-action="oublier-trajet">${uiIcon("close")} Effacer</button>` : ""}
-          </form>
-        </section>
-        <section class="reglages">
-          <h2 class="field-label">${uiIcon("bell", 14)} Alertes</h2>
-          <label class="check"><input type="checkbox" data-reglage="visuel" ${reglages.visuel ? "checked" : ""}><span>${uiIcon("bell")} Alertes visuelles</span></label>
-          <label class="check"><input type="checkbox" data-reglage="son" ${reglages.son ? "checked" : ""}><span>${uiIcon("volume")} Alertes sonores</span></label>
-          <label class="check"><input type="checkbox" data-reglage="gps" ${reglages.gps ? "checked" : ""}><span>${uiIcon("locate")} GPS et alerte à l’approche</span></label>
-          <label class="check"><input type="checkbox" data-reglage="conduite" ${reglages.conduite ? "checked" : ""}><span>${uiIcon("car")} Mode conduite</span></label>
-          <label class="check"><input type="checkbox" data-reglage="heures" ${reglages.heures ? "checked" : ""}><span>${uiIcon("clock")} Seulement aux heures de vigilance</span></label>
-          <div class="heures">
-            <input class="field" type="time" data-heure="debut" value="${esc(reglages.debut)}">
-            <input class="field" type="time" data-heure="fin" value="${esc(reglages.fin)}">
-            <input class="field" type="time" data-heure="debut2" value="${esc(reglages.debut2)}">
-            <input class="field" type="time" data-heure="fin2" value="${esc(reglages.fin2)}">
-          </div>
-          <button type="button" class="btn btn-ghost btn-block" data-action="silence">${uiIcon("moon")} Silence pendant 2 heures</button>
-        </section>` : ""}
-      <button type="button" class="btn btn-ghost btn-block" data-action="back">${uiIcon("back")} Retour à la carte</button>
+        ${carteInfos()}
+        <button type="button" class="btn btn-ghost btn-block" data-action="sortie">${uiIcon("logout")} Se déconnecter</button>`}
+      ${premium && panneau === "veille" ? panneauVeille(listesHtml) : ""}
+      ${premium && panneau === "alertes" ? panneauAlertes(reglages) : ""}
+      ${premium && panneau === "profil" ? panneauProfil() : ""}
       ${state.compte.est_admin ? `<a class="btn btn-ghost btn-block" href="/admin/">${uiIcon("layers")} Administration</a>` : ""}
     </div>`;
+}
+
+function carteInfos() {
+  return `
+    <section class="info-card">
+      <h2>Informations</h2>
+      <p class="muted">Conditions d’utilisation et questions fréquentes.</p>
+      <button type="button" class="btn btn-ghost btn-block" data-action="cgu">Lire les CGU</button>
+      <button type="button" class="btn btn-ghost btn-block" data-action="faq">Questions fréquentes</button>
+    </section>`;
+}
+
+function htmlCgu() {
+  return `
+    <div class="legal-head">
+      <div>
+        <h2 id="legal-title">Conditions générales d’utilisation</h2>
+        <p class="cgu-meta">Dernière mise à jour : 31 octobre 2026</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-compact" id="legal-close" data-legal="fermer">${uiIcon("close")} Fermer</button>
+    </div>
+    <div class="cgu-doc">
+      ${CGU.map((section) => `
+        <section>
+          <h3>${esc(section.titre)}</h3>
+          ${section.paragraphes.map((p) => `<p>${esc(p)}</p>`).join("")}
+          ${section.liste ? `<ul>${section.liste.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : ""}
+        </section>`).join("")}
+    </div>`;
+}
+
+function htmlFaq() {
+  return `
+    <div class="legal-head">
+      <div>
+        <h2 id="legal-title">Questions fréquentes</h2>
+        <p class="cgu-meta">Wayizé · Libreville</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-compact" id="legal-close" data-legal="fermer">${uiIcon("close")} Fermer</button>
+    </div>
+    <div class="faq-list">
+      ${FAQ.map((item) => {
+        const ouvert = state.faqOuverte === item.id;
+        return `
+          <article class="faq-item">
+            <button type="button" data-faq="${esc(item.id)}" aria-expanded="${ouvert ? "true" : "false"}">
+              <span>${esc(item.q)}</span>
+              <span aria-hidden="true">${ouvert ? "–" : "+"}</span>
+            </button>
+            ${ouvert ? `<p>${esc(item.a)}</p>` : ""}
+          </article>`;
+      }).join("")}
+    </div>`;
+}
+
+function peindreLegal(focusSelector) {
+  const root = document.getElementById("legal");
+  const box = document.getElementById("legal-content");
+  if (!root || !box) return;
+  const ouvert = Boolean(state.legal);
+  document.body.classList.toggle("is-legal", ouvert);
+  const sheet = document.getElementById("sheet");
+  const barre = document.querySelector(".topbar");
+  if (sheet) sheet.inert = ouvert;
+  if (barre) barre.inert = ouvert;
+  if (!ouvert) {
+    root.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  root.hidden = false;
+  box.innerHTML = state.legal === "faq" ? htmlFaq() : htmlCgu();
+  const cible = focusSelector ? box.querySelector(focusSelector) : null;
+  if (cible) cible.focus();
+}
+
+function ouvrirLegal(kind) {
+  state.legal = kind;
+  state.faqOuverte = kind === "faq" ? FAQ[0].id : "";
+  peindreLegal("#legal-close");
+}
+
+function fermerLegal() {
+  state.legal = null;
+  peindreLegal();
 }
 
 function renderSheet() {
@@ -1071,10 +1967,14 @@ function render() {
   renderSheet();
   renderChrome();
   syncMarkers();
+  syncTrajet();
   syncPick();
+  peindreVeille();
   setTitle();
   document.body.classList.toggle("is-picking", state.picking);
   document.body.classList.toggle("is-compose", state.mode === "compose");
+  document.body.classList.toggle("is-detail", state.mode === "detail");
+  document.body.classList.toggle("is-account", state.mode === "compte");
   document.body.classList.toggle("is-driving", !!(state.compte && state.compte.premium && assurerReglages().conduite));
   const banner = document.getElementById("pick-banner");
   if (banner) banner.hidden = !state.picking;
@@ -1086,6 +1986,7 @@ function showCompose() {
   state.mode = "compose";
   state.picking = false;
   state.errors = {};
+  if (!(state.draft.lieu || "").trim() && state.place) appliquerLieuSaisi(state.place.nom);
   if (!isDesktop()) setVisible(snapPoints()[2]);
   render();
 }
@@ -1134,9 +2035,39 @@ function setFilter(filter) {
 }
 
 function setType(type) {
+  const connues = new Set(Object.values(PHRASES).flat());
+  const actuel = (state.draft.commentaire || "").trim();
   state.draft.type = type;
+  if (!actuel || connues.has(actuel)) {
+    const phrases = PHRASES[type] || [];
+    state.draft.commentaire = phrases[0] || "";
+  }
   delete state.errors.type;
+  delete state.errors.commentaire;
+  state.typesOuverts = false;
+  state.lieuOuvert = false;
   render();
+  const champ = document.getElementById("lieu-cherche");
+  if (champ) champ.scrollIntoView({ block: "nearest", behavior: prefersReduced() ? "auto" : "smooth" });
+}
+
+function choisirPhrase(index) {
+  const phrases = phrasesDuType();
+  const phrase = phrases[Number(index)];
+  if (!phrase) return;
+  state.draft.commentaire = phrase;
+  delete state.errors.commentaire;
+  render();
+}
+
+function choisirLieu(id) {
+  const lieu = lieuParId(id);
+  if (!lieu) return;
+  appliquerLieuSaisi(lieu.nom);
+  delete state.errors.lieu;
+  state.lieuOuvert = false;
+  render();
+  if (map) map.flyTo([lieu.latitude, lieu.longitude], Math.max(map.getZoom(), 15), { duration: motion() });
 }
 
 function lieuConnu(nom) {
@@ -1154,9 +2085,21 @@ function nomPoseALaMain() {
 
 function lieuAide() {
   const nom = (state.draft.lieu || "").trim();
-  if (state.draft.latitude != null && nom) return "Point placé à Libreville.";
-  if (nom) return "Ce quartier n'est pas dans la liste. Touchez la carte pour le placer.";
-  return "Un nom de la liste, ou le vôtre.";
+  if (!nom) return "La liste s'affine pendant que vous écrivez.";
+  if (lieuConnu(nom) && state.draft.latitude != null) return "";
+  if (state.draft.latitude != null) return `« ${nom} » sera ajouté à la liste.`;
+  return `« ${nom} » est nouveau. Placez-le sur la carte : il sera enregistré.`;
+}
+
+function preparerNouveauLieu() {
+  const nom = (state.draft.lieu || "").replace(/\s+/g, " ").trim();
+  if (nom.length < 2) return;
+  state.draft.lieu = nom;
+  state.draft.lieuId = "";
+  state.lieuOuvert = false;
+  delete state.errors.lieu;
+  if (state.draft.latitude == null) startPick();
+  else render();
 }
 
 function appliquerLieuSaisi(valeur) {
@@ -1184,6 +2127,7 @@ function afficherAideLieu() {
   const aide = document.querySelector(".chosen");
   if (!aide) return;
   aide.textContent = lieuAide();
+  aide.hidden = !aide.textContent;
   aide.classList.toggle("is-set", state.draft.latitude != null);
   if (state.draft.latitude != null) {
     const erreur = document.getElementById("lieu-erreur");
@@ -1228,7 +2172,7 @@ function validate() {
   const nomLieuSaisi = (state.draft.lieu || "").trim();
   if (nomLieuSaisi.length < 2) errors.lieu = "Indiquez le nom du quartier.";
   else if (nomLieuSaisi.length > 120) errors.lieu = "120 caractères maximum.";
-  else if (state.draft.latitude == null) errors.lieu = "Ce quartier n'est pas dans la liste. Touchez la carte pour le placer.";
+  else if (state.draft.latitude == null) errors.lieu = "Placez ce quartier sur la carte. Il sera ajouté à la liste.";
   else if (!inside(state.draft.latitude, state.draft.longitude)) errors.lieu = "Ce point est en dehors du Grand Libreville.";
   return errors;
 }
@@ -1261,9 +2205,11 @@ async function publish(event) {
     state.mode = "detail";
     state.returnMode = "feed";
     state.filter = "tous";
+    const nouveauLieu = Boolean(data.lieu) && !lieuConnu(data.lieu.nom);
+    if (data.lieu) memoriserLieu(data.lieu);
     upsert(data.signalement);
     history.replaceState(null, "", `#s-${data.signalement.id}`);
-    toast("Signalement publié. Merci d'avoir prévenu les autres.");
+    toast(nouveauLieu ? "Signalement publié. Le quartier rejoint la liste." : "Signalement publié.");
     render();
     focusReport(data.signalement);
   } catch (error) {
@@ -1330,9 +2276,10 @@ async function sendComment(event) {
   state.commentError = "";
   render();
   try {
+    const anonyme = commentaireAnonyme();
     const data = await api(`/api/signalements/${state.selectedId}/commentaires/`, {
       method: "POST",
-      body: JSON.stringify({ texte }),
+      body: JSON.stringify({ texte, anonyme }),
     });
     state.detailDraft = "";
     state.commentSending = false;
@@ -1441,12 +2388,14 @@ function applyHashOnce() {
 }
 
 function clearPlace() {
+  const avait = state.place || state.listeId || state.trajet;
   state.place = null;
   state.listeId = null;
   state.trajet = null;
   state.markerKey = "";
   ecrireMemoire({ listeActive: null, trajet: null });
   if (map) map.flyTo([boot.centre.latitude, boot.centre.longitude], homeZoom(), { duration: motion() });
+  if (avait) toast("Toute la ville est affichée.");
   render();
 }
 
@@ -1532,24 +2481,57 @@ function chooseSearchReport(id) {
 
 let gpsWatch = 0;
 let dernierGpsLieu = "";
+let dernierGpsReport = 0;
+
+function ecrireGps(texte) {
+  state.gpsEtat = texte;
+  const el = document.getElementById("gps-etat");
+  if (el) el.textContent = texte;
+}
 
 function reglerGps() {
   if (gpsWatch && navigator.geolocation) navigator.geolocation.clearWatch(gpsWatch);
   gpsWatch = 0;
+  if (gpsLayer) gpsLayer.clearLayers();
   const reglages = assurerReglages();
-  if (!reglages.gps || !state.compte || !state.compte.premium || !navigator.geolocation) return;
+  if (!reglages.gps || !state.compte || !state.compte.premium || !navigator.geolocation) {
+    ecrireGps(reglages.gps ? "La position n'est pas disponible sur cet appareil." : "GPS arrêté.");
+    return;
+  }
+  ecrireGps("Position en attente.");
   gpsWatch = navigator.geolocation.watchPosition((position) => {
     const latitude = position.coords.latitude;
     const longitude = position.coords.longitude;
+    if (gpsLayer) {
+      gpsLayer.clearLayers();
+      L.circleMarker([latitude, longitude], {
+        radius: 7,
+        color: "#171717",
+        weight: 3,
+        fillColor: "#ffffff",
+        fillOpacity: 1,
+      }).addTo(gpsLayer);
+    }
     const proche = boot.lieux.find((lieu) => haversine(latitude, longitude, lieu.latitude, lieu.longitude) <= 1.2);
-    if (!proche || proche.id === dernierGpsLieu) return;
+    ecrireGps(proche ? `Position reçue, près de ${proche.nom}.` : "Position reçue.");
     const liste = listeActive();
-    const suivi = liste && liste.lieux.includes(proche.id);
-    const trajet = state.trajet && (state.trajet.depart === proche.id || state.trajet.arrivee === proche.id);
-    if (!suivi && !trajet) return;
-    dernierGpsLieu = proche.id;
-    alerter(`Vous approchez de ${proche.nom}.`);
-  }, () => {}, { enableHighAccuracy: false, maximumAge: 20000, timeout: 12000 });
+    const suivi = proche && ((liste && liste.lieux.includes(proche.id)) || (state.trajet && (state.trajet.depart === proche.id || state.trajet.arrivee === proche.id)));
+    if (suivi && proche.id !== dernierGpsLieu) {
+      dernierGpsLieu = proche.id;
+      alerter(`Vous approchez de ${proche.nom}.`);
+    }
+    const incident = state.reports.find((report) => (
+      encoreValide(report)
+      && typeSurveille(report)
+      && haversine(latitude, longitude, report.latitude, report.longitude) <= 1.2
+    ));
+    if (incident && incident.id !== dernierGpsReport) {
+      dernierGpsReport = incident.id;
+      alerter(`${incident.type_label} à proximité, vers ${incident.lieu}.`);
+    }
+  }, () => {
+    ecrireGps("La position a été refusée.");
+  }, { enableHighAccuracy: false, maximumAge: 20000, timeout: 12000 });
 }
 
 function memoriserSession() {
@@ -1575,7 +2557,7 @@ async function chargerCompte() {
   try {
     const data = await api("/api/comptes/moi/");
     appliquerCompte(data.compte);
-    if (state.mode === "compte") render();
+    if (state.mode === "compte" || state.mode === "feed") render();
   } catch (error) {
     if (error.status === 401) {
       state.jeton = "";
@@ -1589,33 +2571,158 @@ function ouvrirCompte() {
   state.mode = "compte";
   state.compteErreur = "";
   state.picking = false;
-  if (!isDesktop()) setVisible(state.compte ? snapPoints()[2] : Math.min(430, sheetCeiling()));
+  if (!isDesktop()) setVisible(state.compte ? snapPoints()[2] : Math.min(560, sheetCeiling()));
   render();
 }
 
 async function envoyerCompte(inscription) {
   const email = (document.getElementById("compte-email") || {}).value || "";
   const mot = (document.getElementById("compte-mot") || {}).value || "";
+  const pseudoChamp = document.getElementById("compte-pseudo");
+  if (pseudoChamp) state.comptePseudo = pseudoChamp.value.trim();
+  const cgu = document.getElementById("compte-cgu");
+  if (cgu) state.compteCgu = cgu.checked;
   state.compteEmail = email.trim();
+  if (inscription && !state.compteCgu) {
+    state.compteErreur = "Acceptez les conditions d’utilisation pour créer un compte.";
+    render();
+    return;
+  }
   state.compteEnCours = true;
   state.compteErreur = "";
   render();
   try {
+    const corps = { email, mot_de_passe: mot };
+    if (inscription) corps.pseudo = state.comptePseudo || "";
     const data = await api(inscription ? "/api/comptes/inscription/" : "/api/comptes/connexion/", {
       method: "POST",
-      body: JSON.stringify({ email, mot_de_passe: mot }),
+      body: JSON.stringify(corps),
     });
     state.compteEnCours = false;
+    if (inscription) {
+      state.compteMode = "attente";
+      state.compteMessage = data.message || "Confirmez votre adresse pour ouvrir le compte.";
+      state.compteLien = data.lien || "";
+      toast("Confirmez votre adresse.");
+      render();
+      return;
+    }
     appliquerCompte(data.compte, data.jeton);
-    toast(inscription ? "Compte créé." : "Vous êtes connecté.");
+    toast("Vous êtes connecté.");
     if (!isDesktop() && state.mode === "compte") setVisible(snapPoints()[2]);
     render();
   } catch (error) {
     state.compteEnCours = false;
     const champs = error.data && error.data.erreurs;
-    state.compteErreur = (champs && (champs.email || champs.mot_de_passe)) || messageFrom(error, "Le compte n'a pas répondu.");
+    state.compteErreur = (champs && (champs.email || champs.mot_de_passe || champs.pseudo)) || messageFrom(error, "Le compte n'a pas répondu.");
+    if (!inscription && error.status === 403) {
+      state.compteMode = "attente";
+      state.compteMessage = state.compteErreur;
+      state.compteLien = "";
+    }
     render();
   }
+}
+
+function jetonDansLien(lien, cle) {
+  try {
+    return new URL(lien, location.origin).searchParams.get(cle) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+async function confirmerAdresse(clair) {
+  try {
+    const data = await api("/api/comptes/confirmer/", {
+      method: "POST",
+      body: JSON.stringify({ jeton: clair }),
+    });
+    appliquerCompte(data.compte, data.jeton);
+    state.mode = "compte";
+    state.compteErreur = "";
+    toast("Adresse confirmée. Vous êtes connecté.");
+    render();
+  } catch (error) {
+    state.mode = "compte";
+    state.compteMode = "connexion";
+    state.compteErreur = messageFrom(error, "Ce lien n'est plus valable.");
+    render();
+  }
+}
+
+async function renvoyerConfirmation() {
+  state.compteEnCours = true;
+  state.compteErreur = "";
+  render();
+  try {
+    const data = await api("/api/comptes/renvoyer/", {
+      method: "POST",
+      body: JSON.stringify({ email: state.compteEmail }),
+    });
+    state.compteEnCours = false;
+    state.compteLien = data.lien || "";
+    state.compteMessage = data.message || state.compteMessage;
+    toast("Le message est renvoyé.");
+    render();
+  } catch (error) {
+    state.compteEnCours = false;
+    state.compteErreur = messageFrom(error, "Le message n'a pas pu partir.");
+    render();
+  }
+}
+
+async function demanderMot() {
+  const email = (document.getElementById("compte-email") || {}).value || "";
+  state.compteEmail = email.trim();
+  state.compteEnCours = true;
+  state.compteErreur = "";
+  render();
+  try {
+    const data = await api("/api/comptes/mot-oublie/", {
+      method: "POST",
+      body: JSON.stringify({ email: state.compteEmail }),
+    });
+    state.compteEnCours = false;
+    state.compteMessage = data.message || "";
+    state.compteLien = data.lien || "";
+    state.compteJetonMail = jetonDansLien(state.compteLien, "reinitialiser");
+    toast("Si le compte existe, le lien est prêt.");
+    render();
+  } catch (error) {
+    state.compteEnCours = false;
+    state.compteErreur = messageFrom(error, "Le message n'a pas pu partir.");
+    render();
+  }
+}
+
+async function choisirMot() {
+  const mot = (document.getElementById("compte-mot") || {}).value || "";
+  state.compteEnCours = true;
+  state.compteErreur = "";
+  render();
+  try {
+    const data = await api("/api/comptes/mot-nouveau/", {
+      method: "POST",
+      body: JSON.stringify({ jeton: state.compteJetonMail, mot_de_passe: mot }),
+    });
+    state.compteEnCours = false;
+    state.compteJetonMail = "";
+    appliquerCompte(data.compte, data.jeton);
+    toast("Mot de passe enregistré.");
+    render();
+  } catch (error) {
+    state.compteEnCours = false;
+    const champs = error.data && error.data.erreurs;
+    state.compteErreur = (champs && champs.mot_de_passe) || messageFrom(error, "Le mot de passe n'a pas pu être enregistré.");
+    render();
+  }
+}
+
+async function enregistrerProfil(partiel, options) {
+  const data = await api("/api/comptes/profil/", { method: "POST", body: JSON.stringify(partiel) });
+  appliquerCompte(data.compte);
+  if (!options || !options.silencieux) render();
 }
 
 async function activerPremium() {
@@ -1681,16 +2788,24 @@ async function supprimerListe(id) {
 }
 
 function suivreListe(id) {
-  state.listeId = state.listeId === id ? null : Number(id);
+  const arret = state.listeId === id;
+  const connue = ((state.compte && state.compte.listes) || []).find((liste) => liste.id === id);
+  state.listeId = arret ? null : Number(id);
   state.trajet = null;
   state.place = null;
   state.markerKey = "";
   memoriserSession();
+  if (arret) {
+    toast("Suivi arrêté. Toute la ville est affichée.");
+    render();
+    return;
+  }
   state.mode = "feed";
   if (!isDesktop()) setVisible(snapPoints()[1]);
   const liste = listeActive();
   const premier = liste && liste.lieux.length ? lieuParId(liste.lieux[0]) : null;
   if (premier && map) map.flyTo([premier.latitude, premier.longitude], 14, { duration: motion() });
+  toast(connue ? `Liste « ${connue.nom} » en cours.` : "Liste en cours.");
   render();
 }
 
@@ -1711,6 +2826,7 @@ function suivreTrajet(depart, arrivee) {
     map.fitBounds([[a.latitude, a.longitude], [b.latitude, b.longitude]], { padding: [40, 40] });
   }
   if (!isDesktop()) setVisible(snapPoints()[1]);
+  toast(`Trajet ${nomLieu(depart)} → ${nomLieu(arrivee)} en cours.`);
   render();
 }
 
@@ -1730,6 +2846,7 @@ function changerReglage(nom, valeur) {
     }
     reglerGps();
   }
+  if (nom === "heures" || nom === "gps") render();
 }
 
 function restaurerMemoire() {
@@ -1755,11 +2872,76 @@ function onSheetClick(event) {
   else if (action === "open") selectReport(Number(el.dataset.id));
   else if (action === "back") goBack();
   else if (action === "compose") showCompose();
+  else if (action === "auth-mode") {
+    const email = document.getElementById("compte-email");
+    if (email) state.compteEmail = email.value;
+    const modes = ["connexion", "inscription", "oubli", "attente", "nouveau"];
+    state.compteMode = modes.includes(el.dataset.mode) ? el.dataset.mode : "connexion";
+    state.compteErreur = "";
+    state.compteLien = "";
+    render();
+    const champ = document.getElementById("compte-email") || document.getElementById("compte-mot");
+    if (champ) champ.focus();
+  }
+  else if (action === "ouvrir-trajet" || action === "suivre-domicile") {
+    const form = document.getElementById("domicile-form");
+    const data = form ? new FormData(form) : null;
+    const domicile = data ? String(data.get("domicile") || "") : (state.compte && state.compte.domicile_id) || "";
+    const travail = data ? String(data.get("travail") || "") : (state.compte && state.compte.travail_id) || "";
+    if (!domicile || !travail || domicile === travail) {
+      toast("Choisissez deux quartiers différents dans la liste.");
+      return;
+    }
+    if (state.trajet && state.trajet.depart === domicile && state.trajet.arrivee === travail) {
+      state.mode = "feed";
+      if (!isDesktop()) setVisible(snapPoints()[1]);
+      toast(`Trajet ${nomLieu(domicile)} → ${nomLieu(travail)} en cours.`);
+      render();
+      return;
+    }
+    enregistrerProfil({ domicile_id: domicile, travail_id: travail }, { silencieux: true })
+      .then(() => suivreTrajet(domicile, travail))
+      .catch((error) => toast(messageFrom(error, "Le trajet n'a pas pu être enregistré.")));
+  }
+  else if (action === "compte-panneau") {
+    const panneau = el.dataset.panneau;
+    if (panneau === "veille" || panneau === "alertes" || panneau === "profil") {
+      state.comptePanneau = panneau;
+      render();
+    }
+  }
+  else if (action === "autre-trajet") {
+    state.autreTrajet = !state.autreTrajet;
+    render();
+  }
+  else if (action === "type-veille") {
+    const reglages = assurerReglages();
+    const tous = FILTERS.filter((chip) => chip.id !== "tous").map((chip) => chip.id);
+    const actuel = Array.isArray(reglages.types) && reglages.types.length ? reglages.types.slice() : tous.slice();
+    const type = el.dataset.type;
+    const index = actuel.indexOf(type);
+    if (index === -1) actuel.push(type);
+    else actuel.splice(index, 1);
+    reglages.types = actuel.length === tous.length || !actuel.length ? null : actuel;
+    memoriserSession();
+    render();
+  }
   else if (action === "type") setType(el.dataset.type);
+  else if (action === "types") {
+    state.typesOuverts = !state.typesOuverts;
+    state.lieuOuvert = false;
+    render();
+  }
+  else if (action === "phrase") choisirPhrase(el.dataset.index);
+  else if (action === "lieu-rapide") choisirLieu(el.dataset.lieu);
+  else if (action === "lieu-nouveau") preparerNouveauLieu();
+  else if (action === "cgu") ouvrirLegal("cgu");
+  else if (action === "faq") ouvrirLegal("faq");
   else if (action === "pick") startPick();
   else if (action === "appui") support(Number(el.dataset.id));
   else if (action === "degage") degager(Number(el.dataset.id));
   else if (action === "retry") reload();
+  else if (action === "choisir-lieu") choisirLieuPick(el);
   else if (action === "clear-place") clearPlace();
   else if (action === "compte") ouvrirCompte();
   else if (action === "connexion") envoyerCompte(false);
@@ -1775,9 +2957,17 @@ function onSheetClick(event) {
     memoriserSession();
     render();
   } else if (action === "silence") {
-    assurerReglages().silenceJusqua = Date.now() + 2 * 60 * 60 * 1000;
-    memoriserSession();
-    toast("Alertes en silence pour 2 heures.");
+    const reglages = assurerReglages();
+    if (reglages.silenceJusqua && Date.now() < reglages.silenceJusqua) {
+      reglages.silenceJusqua = 0;
+      memoriserSession();
+      toast("Les alertes reprennent.");
+    } else {
+      reglages.silenceJusqua = Date.now() + 2 * 60 * 60 * 1000;
+      memoriserSession();
+      toast("Alertes en silence pour 2 heures.");
+    }
+    render();
   }
 }
 
@@ -1791,6 +2981,10 @@ function onSubmit(event) {
   } else if (event.target.classList.contains("liste-ajout") && event.target.dataset.liste) {
     event.preventDefault();
     const lieu = new FormData(event.target).get("lieu_id");
+    if (!lieu) {
+      toast("Choisissez un quartier.");
+      return;
+    }
     ajouterLieuListe(Number(event.target.dataset.liste), String(lieu || "")).catch((error) => {
       toast(messageFrom(error, "Le lieu n'a pas pu être ajouté."));
     });
@@ -1800,7 +2994,22 @@ function onSubmit(event) {
     suivreTrajet(String(data.get("depart") || ""), String(data.get("arrivee") || ""));
   } else if (event.target.id === "compte-form") {
     event.preventDefault();
-    envoyerCompte(false);
+    if (state.compteMode === "inscription") envoyerCompte(true);
+    else if (state.compteMode === "oubli") demanderMot();
+    else if (state.compteMode === "attente") renvoyerConfirmation();
+    else if (state.compteMode === "nouveau") choisirMot();
+    else envoyerCompte(false);
+  } else if (event.target.id === "pseudo-form") {
+    event.preventDefault();
+    const pseudo = String(new FormData(event.target).get("pseudo") || "");
+    enregistrerProfil({ pseudo }).catch((error) => toast(messageFrom(error, "Le pseudo n'a pas pu être enregistré.")));
+  } else if (event.target.id === "domicile-form") {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    enregistrerProfil({
+      domicile_id: String(data.get("domicile") || ""),
+      travail_id: String(data.get("travail") || ""),
+    }).catch((error) => toast(messageFrom(error, "Le trajet n'a pas pu être enregistré.")));
   }
 }
 
@@ -1811,6 +3020,12 @@ function onChange(event) {
     afficherAideLieu();
     if (connu && map) map.flyTo([connu.latitude, connu.longitude], Math.max(map.getZoom(), 15), { duration: motion() });
   }
+  if (event.target.id === "compte-cgu") state.compteCgu = event.target.checked;
+  if (event.target.id === "comment-anonyme") state.commentAnonyme = event.target.checked;
+  if (event.target.id === "anonyme-defaut") {
+    state.commentAnonyme = event.target.checked;
+    enregistrerProfil({ anonyme: event.target.checked }).catch((error) => toast(messageFrom(error, "Le réglage n'a pas pu être enregistré.")));
+  }
   if (event.target.dataset.reglage) changerReglage(event.target.dataset.reglage, event.target.checked);
   if (event.target.dataset.heure) {
     assurerReglages()[event.target.dataset.heure] = event.target.value;
@@ -1819,16 +3034,35 @@ function onChange(event) {
 }
 
 function onInput(event) {
+  if (event.target.classList && event.target.classList.contains("pick-input")) peindrePick(event.target);
   if (event.target.id === "commentaire") {
     state.draft.commentaire = event.target.value;
     const counter = document.getElementById("commentaire-count");
     if (counter) counter.textContent = `${event.target.value.trim().length}/280`;
+    peindreConsigne();
   }
   if (event.target.id === "detail-commentaire") state.detailDraft = event.target.value;
   if (event.target.id === "lieu-saisie") {
-    appliquerLieuSaisi(event.target.value);
+    const connu = appliquerLieuSaisi(event.target.value);
+    state.lieuOuvert = !connu;
     afficherAideLieu();
+    peindreLieux();
+    peindreConsigne();
+    const pick = document.querySelector(".pick-btn");
+    if (pick) {
+      pick.hidden = state.draft.latitude != null;
+      pick.classList.toggle("is-needed", Boolean((state.draft.lieu || "").trim()) && state.draft.latitude == null);
+    }
+    event.target.setAttribute("aria-expanded", state.lieuOuvert ? "true" : "false");
   }
+}
+
+function peindreConsigne() {
+  const el = document.getElementById("compose-status");
+  if (!el) return;
+  const pret = !Object.keys(validate()).length;
+  el.textContent = consigneSignalement();
+  el.classList.toggle("is-ready", pret);
 }
 
 function bindGrabber() {
@@ -1860,11 +3094,41 @@ function bindGrabber() {
 function bind() {
   const sheet = document.getElementById("sheet-content");
   sheet.addEventListener("click", onSheetClick);
+  sheet.addEventListener("pointerdown", (event) => {
+    const el = event.target.closest("[data-action='choisir-lieu']");
+    if (!el) return;
+    event.preventDefault();
+    choisirLieuPick(el);
+  });
   sheet.addEventListener("submit", onSubmit);
   sheet.addEventListener("change", onChange);
   sheet.addEventListener("input", onInput);
+  sheet.addEventListener("focusin", (event) => {
+    if (event.target.id !== "lieu-saisie") return;
+    const valeur = event.target.value || "";
+    if (valeur.trim().length < 2 || lieuConnu(valeur)) return;
+    state.lieuOuvert = true;
+    peindreLieux();
+    event.target.setAttribute("aria-expanded", "true");
+  });
+  document.getElementById("legal").addEventListener("click", (event) => {
+    if (event.target.id === "legal-backdrop" || event.target.closest("[data-legal='fermer']")) {
+      fermerLegal();
+      return;
+    }
+    const item = event.target.closest("[data-faq]");
+    if (!item) return;
+    const id = item.dataset.faq;
+    state.faqOuverte = state.faqOuverte === id ? "" : id;
+    peindreLegal(`[data-faq="${CSS.escape(id)}"]`);
+  });
   document.getElementById("recenter").addEventListener("click", () => {
     clearPlace();
+  });
+  document.querySelector(".fonds").addEventListener("click", (event) => {
+    const bouton = event.target.closest("[data-fond]");
+    if (!bouton) return;
+    appliquerFond(bouton.dataset.fond);
   });
   document.getElementById("search-toggle").addEventListener("click", () => setSearchOpen(true));
   document.getElementById("search-close").addEventListener("click", () => setSearchOpen(false));
@@ -1915,6 +3179,10 @@ function bind() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (state.legal) {
+      fermerLegal();
+      return;
+    }
     if (state.searchOpen) {
       setSearchOpen(false);
       return;
@@ -1933,7 +3201,10 @@ function bind() {
     if (state.mode !== "feed") goBack();
   });
   window.addEventListener("resize", () => {
-    if (map) map.invalidateSize();
+    if (map) {
+      map.invalidateSize();
+      syncNoms();
+    }
     if (!isDesktop()) snapTo(visiblePx());
   });
   window.addEventListener("online", () => reload());
@@ -1941,9 +3212,28 @@ function bind() {
   bindGrabber();
 }
 
+function lireLienCompte() {
+  const params = new URLSearchParams(location.search);
+  const confirmer = params.get("confirmer");
+  const reinitialiser = params.get("reinitialiser");
+  if (!confirmer && !reinitialiser) return;
+  params.delete("confirmer");
+  params.delete("reinitialiser");
+  const reste = params.toString();
+  history.replaceState(null, "", `${location.pathname}${reste ? `?${reste}` : ""}${location.hash}`);
+  if (confirmer) {
+    confirmerAdresse(confirmer);
+    return;
+  }
+  state.compteJetonMail = reinitialiser;
+  state.compteMode = "nouveau";
+  state.mode = "compte";
+}
+
 function start() {
   boot = JSON.parse(document.getElementById("boot-data").textContent);
   restaurerMemoire();
+  lireLienCompte();
   initMap();
   bind();
   if (!isDesktop()) setVisible(visiblePx());

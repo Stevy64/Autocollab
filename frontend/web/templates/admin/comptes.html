@@ -1,15 +1,34 @@
 {% extends "admin/base.html" %}
-{% block title %}Comptes — Wayizé{% endblock %}
+{% block title %}{% if filtre == "abonnes" %}Abonnés{% else %}Usagers{% endif %} — Wayizé{% endblock %}
 {% block content %}
 <header class="wa-hero">
   <div>
-    <p class="wa-kicker">Droits</p>
-    <h1>Comptes</h1>
-    <p class="wa-lead">Premium ouvre les listes de lieux. Le droit d’administration ouvre cette console. Il doit rester au moins un administrateur.</p>
+    <p class="wa-kicker">{% if filtre == "abonnes" %}Premium{% else %}Droits{% endif %}</p>
+    <h1>{% if filtre == "abonnes" %}Abonnés{% else %}Usagers{% endif %}</h1>
+    <p class="wa-lead">{{ abonnes_n }} abonné{{ abonnes_n|pluralize }} Premium. Le droit d’administration ouvre cette console. Il doit rester au moins un administrateur.</p>
+  </div>
+  <div class="wa-hero-actions">
+    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-reglages' %}">{% include "admin/icone.html" with name="star" %} Prix Premium</a>
   </div>
 </header>
 
+<nav class="wa-tabs" aria-label="Filtrer les usagers">
+  <a class="wa-tab{% if not filtre %} is-active{% endif %}" href="{{ liens.tous }}">Tous</a>
+  <a class="wa-tab{% if filtre == 'abonnes' %} is-active{% endif %}" href="{{ liens.abonnes }}">Abonnés</a>
+  <a class="wa-tab{% if filtre == 'admins' %} is-active{% endif %}" href="{{ liens.admins }}">Admins</a>
+  <a class="wa-tab{% if filtre == 'attente' %} is-active{% endif %}" href="{{ liens.attente }}">À confirmer{% if attente_n %} · {{ attente_n }}{% endif %}</a>
+</nav>
+
 <section class="wa-panel">
+  <form class="wa-filters wa-panel-bar" method="get" action="{% url 'admin-comptes' %}">
+    {% if filtre %}<input type="hidden" name="filtre" value="{{ filtre }}">{% endif %}
+    <label class="wa-sr" for="q">Recherche</label>
+    <div class="wa-field wa-field-grow">
+      <span class="wa-field-ico" aria-hidden="true">{% include "admin/icone.html" with name="search" %}</span>
+      <input id="q" name="q" type="search" placeholder="Email ou pseudo" value="{{ q }}" maxlength="80">
+    </div>
+    <button class="wa-btn wa-btn-dark" type="submit">{% include "admin/icone.html" with name="search" %} Chercher</button>
+  </form>
   {% if admins_n == 1 %}
   <div class="wa-banner">
     <span aria-hidden="true">{% include "admin/icone.html" with name="shield" %}</span>
@@ -25,11 +44,13 @@
         <span class="wa-avatar wa-avatar-lg" aria-hidden="true">{{ ligne.email|slice:":1"|upper }}</span>
         <div class="wa-person-copy">
           <h2>{{ ligne.email }}</h2>
-          <p>Depuis le {{ ligne.quand }}{% if ligne.id == moi %} <span class="wa-you">Vous</span>{% endif %}</p>
+          <p>{% if ligne.pseudo %}{{ ligne.pseudo }} · {% else %}Sans pseudo · {% endif %}{% if ligne.confirme %}email confirmé{% else %}confirmation en attente{% endif %} · depuis le {{ ligne.quand }}{% if ligne.id == moi %} <span class="wa-you">Vous</span>{% endif %}</p>
         </div>
       </div>
       <form class="wa-rights" method="post" action="{% url 'admin-compte' ligne.id %}">
         {% csrf_token %}
+        {% if filtre %}<input type="hidden" name="filtre" value="{{ filtre }}">{% endif %}
+        {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
         <label class="wa-switch is-premium">
           <input type="checkbox" name="premium" value="1"{% if ligne.premium %} checked{% endif %}>
           <span class="wa-switch-ui">
@@ -59,8 +80,8 @@
   {% else %}
   <div class="wa-empty">
     <span class="wa-empty-ico" aria-hidden="true">{% include "admin/icone.html" with name="users" %}</span>
-    <h2>Aucun compte</h2>
-    <p>Les comptes se créent depuis la carte.</p>
+    <h2>{% if filtre == "abonnes" %}Aucun abonné{% elif filtre == "attente" %}Aucune confirmation en attente{% elif q %}Aucun résultat{% else %}Aucun usager{% endif %}</h2>
+    <p>{% if filtre == "abonnes" %}Le droit Premium se donne depuis la liste des usagers, ou depuis la carte.{% else %}Les comptes se créent depuis la carte.{% endif %}</p>
   </div>
   {% endif %}
 </section>

@@ -759,6 +759,66 @@ h1, h2, p { margin: 0; }
 .wa-switch.is-locked { cursor: default; }
 .wa-rights .wa-btn { min-height: 36px; padding: 0 12px; font-size: 0.84rem; }
 
+.wa-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.wa-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--wa-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--wa-ink);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.wa-tab.is-active { background: var(--wa-ink); color: #fff; border-color: var(--wa-ink); }
+.wa-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 22px 4px;
+  border-bottom: 1px solid var(--wa-hair);
+}
+.wa-block h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+.wa-block p { margin: 0 0 10px; color: var(--wa-muted); font-size: 0.88rem; line-height: 1.45; max-width: 68ch; }
+.wa-set-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.wa-choice { display: flex; flex-wrap: wrap; gap: 8px; }
+.wa-choice label,
+.wa-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--wa-line);
+  border-radius: 14px;
+  background: var(--wa-soft);
+  font-weight: 600;
+  cursor: pointer;
+}
+.wa-choice input,
+.wa-check input { width: 18px; height: 18px; margin: 0; }
 .wa-settings { display: block; max-width: none; }
 .wa-set {
   display: grid;

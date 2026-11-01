@@ -10,9 +10,11 @@ from apps.http import erreur, lire_json, nombre, protege, reponse, texte_propre
 from apps.identite import cle_session
 from apps.journal import journal, request_id
 
-from apps.pilotage.reglages import lire
+from apps.pilotage.reglages import lire, publics
 
-from .geo import CENTRE, EST, LIEUX, NORD, OUEST, SUD, dans_libreville
+from apps.lieux.catalogue import lieux_publics, memoiser_lieu
+
+from .geo import CENTRE, EST, NORD, OUEST, SUD, dans_libreville
 from .models import Signalement
 from .present import signalement_public, tendance
 
@@ -80,7 +82,7 @@ def charger(pk):
     return base_signalements().get(pk=pk)
 
 
-def reponse_signalement(request, pk, status=200):
+def reponse_signalement(request, pk, status=200, lieu=None):
     try:
         item = charger(pk)
     except Signalement.DoesNotExist:
@@ -88,25 +90,30 @@ def reponse_signalement(request, pk, status=200):
     cle = cle_session(request)
     appuye = item.id in ids_appuyes(cle, [item.id])
     degage = item.id in ids_degages(cle, [item.id])
-    return reponse({"signalement": signalement_public(item, appuye, degage)}, status=status)
+    corps = {"signalement": signalement_public(item, appuye, degage)}
+    if lieu:
+        corps["lieu"] = lieu
+    return reponse(corps, status=status)
 
 
 @require_GET
 def carte(request):
+    liste = lieux_publics()
     journal(
         "signalements",
         "carte.read",
         request_id=request_id(request),
-        lieux=len(LIEUX),
+        lieux=len(liste),
     )
     return reponse(
         {
-            "lieux": LIEUX,
+            "lieux": liste,
             "types": [
                 {"id": value, "label": label} for value, label in Signalement.Type.choices
             ],
             "centre": CENTRE,
             "bornes": {"sud": SUD, "ouest": OUEST, "nord": NORD, "est": EST},
+            "reglages": publics(),
         }
     )
 
@@ -209,7 +216,7 @@ def creer(request):
         )
         return erreur(
             "Vous avez déjà publié plusieurs signalements dans l'heure. "
-            "Merci de laisser de la place aux autres conducteurs.",
+            "Merci de laisser de la place aux autres usagers.",
             status=429,
         )
     try:
@@ -243,4 +250,5 @@ def creer(request):
         lieu=signalement.lieu,
         commentaire_len=len(commentaire),
     )
-    return reponse_signalement(request, signalement.pk, status=201)
+    lieu_enregistre = memoiser_lieu(signalement.lieu, signalement.latitude, signalement.longitude)
+    return reponse_signalement(request, signalement.pk, status=201, lieu=lieu_enregistre)

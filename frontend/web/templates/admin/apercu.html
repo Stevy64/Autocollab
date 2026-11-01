@@ -8,9 +8,9 @@
     <p class="wa-lead">Ce qui est sur la carte en ce moment, et les règles qui le font vivre.</p>
   </div>
   <div class="wa-hero-actions">
-    <a class="wa-btn wa-btn-dark" href="{% url 'admin-signalements' %}">{% include "admin/icone.html" with name="pin" %} Signalements</a>
-    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-comptes' %}">{% include "admin/icone.html" with name="users" %} Comptes</a>
-    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-reglages' %}">{% include "admin/icone.html" with name="sliders" %} Réglages</a>
+    <a class="wa-btn wa-btn-dark" href="{% url 'admin-signalements' %}">{% include "admin/icone.html" with name="pin" %} Alertes</a>
+    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-comptes' %}">{% include "admin/icone.html" with name="users" %} Usagers</a>
+    <a class="wa-btn wa-btn-quiet" href="{% url 'admin-reglages' %}">{% include "admin/icone.html" with name="sliders" %} Paramètres</a>
   </div>
 </header>
 
@@ -22,9 +22,9 @@
     <span class="wa-metric-sub">{{ en_retrait }} en cours de retrait</span>
   </article>
   <article class="wa-metric">
-    <span class="wa-metric-label">{% include "admin/icone.html" with name="users" %} Comptes</span>
+    <span class="wa-metric-label">{% include "admin/icone.html" with name="users" %} Usagers</span>
     <strong>{{ comptes_n }}</strong>
-    <span class="wa-metric-sub">{{ premium_n }} premium · {{ admins_n }} admin{{ admins_n|pluralize }}</span>
+    <span class="wa-metric-sub">{{ premium_n }} abonné{{ premium_n|pluralize }} · {{ admins_n }} admin{{ admins_n|pluralize }}</span>
   </article>
   <article class="wa-metric">
     <span class="wa-metric-label">{% include "admin/icone.html" with name="check" %} Confirmations</span>
@@ -36,6 +36,7 @@
     <strong>{{ reglages.duree_heures }} h</strong>
     <span class="wa-metric-sub">{{ reglages.seuil_degage }} votes pour retirer</span>
     <span class="wa-metric-sub">{{ reglages.plafond_heure }} par heure</span>
+    <span class="wa-metric-sub">{% if reglages.prix_premium %}{{ reglages.prix_premium }} F / mois{% else %}Premium offert{% endif %} · {% if reglages.fond_defaut == "routes" %}Routes{% else %}Satellite{% endif %}</span>
   </article>
 </section>
 

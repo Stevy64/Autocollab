@@ -8,7 +8,7 @@
   <meta name="robots" content="noindex">
   <title>{% block title %}Administration — Wayizé{% endblock %}</title>
   <link rel="icon" href="{% static 'trafic/icons/favicon-32.png' %}" sizes="32x32" type="image/png">
-  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}">
+  <link rel="stylesheet" href="{% static 'trafic/css/admin.css' %}?v=20261101h">
 </head>
 <body class="wa">
   <a class="wa-skip" href="#contenu">Aller au contenu</a>
@@ -32,17 +32,21 @@
         <span class="wa-ico">{% include "admin/icone.html" with name="grid" %}</span>
         <span class="wa-label">Vue d’ensemble</span>
       </a>
-      <a class="wa-nav-item{% if nav == 'signalements' %} is-active{% endif %}" href="{% url 'admin-signalements' %}" {% if nav == 'signalements' %}aria-current="page"{% endif %} title="Signalements">
+      <a class="wa-nav-item{% if nav == 'signalements' %} is-active{% endif %}" href="{% url 'admin-signalements' %}" {% if nav == 'signalements' %}aria-current="page"{% endif %} title="Alertes">
         <span class="wa-ico">{% include "admin/icone.html" with name="pin" %}</span>
-        <span class="wa-label">Signalements</span>
+        <span class="wa-label">Alertes</span>
       </a>
-      <a class="wa-nav-item{% if nav == 'comptes' %} is-active{% endif %}" href="{% url 'admin-comptes' %}" {% if nav == 'comptes' %}aria-current="page"{% endif %} title="Comptes">
+      <a class="wa-nav-item{% if nav == 'comptes' %} is-active{% endif %}" href="{% url 'admin-comptes' %}" {% if nav == 'comptes' %}aria-current="page"{% endif %} title="Usagers">
         <span class="wa-ico">{% include "admin/icone.html" with name="users" %}</span>
-        <span class="wa-label">Comptes</span>
+        <span class="wa-label">Usagers</span>
       </a>
-      <a class="wa-nav-item{% if nav == 'reglages' %} is-active{% endif %}" href="{% url 'admin-reglages' %}" {% if nav == 'reglages' %}aria-current="page"{% endif %} title="Réglages">
+      <a class="wa-nav-item{% if nav == 'abonnes' %} is-active{% endif %}" href="{% url 'admin-comptes' %}?filtre=abonnes" {% if nav == 'abonnes' %}aria-current="page"{% endif %} title="Abonnés">
+        <span class="wa-ico">{% include "admin/icone.html" with name="star" %}</span>
+        <span class="wa-label">Abonnés</span>
+      </a>
+      <a class="wa-nav-item{% if nav == 'reglages' %} is-active{% endif %}" href="{% url 'admin-reglages' %}" {% if nav == 'reglages' %}aria-current="page"{% endif %} title="Paramètres">
         <span class="wa-ico">{% include "admin/icone.html" with name="sliders" %}</span>
-        <span class="wa-label">Réglages</span>
+        <span class="wa-label">Paramètres</span>
       </a>
     </nav>
     <div class="wa-sidefoot">

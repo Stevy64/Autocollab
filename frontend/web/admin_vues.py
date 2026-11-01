@@ -112,10 +112,17 @@ def _borne_saisie(valeur, bas, haut):
 
 def _reglages(data):
     data = data if isinstance(data, dict) else {}
+    fond = data.get("fond_defaut")
+    if fond not in ("satellite", "routes"):
+        fond = "satellite"
     return {
         "duree_heures": _entier(data.get("duree_heures"), 1, 12, 3),
         "seuil_degage": _entier(data.get("seuil_degage"), 2, 5, 2),
         "plafond_heure": _entier(data.get("plafond_heure"), 1, 24, 8),
+        "prix_premium": _entier(data.get("prix_premium"), 0, 100000, 1500),
+        "fond_defaut": fond,
+        "routes_actives": data.get("routes_actives") is not False,
+        "inscriptions_ouvertes": data.get("inscriptions_ouvertes") is not False,
     }
 
 
@@ -331,10 +338,23 @@ def _ligne_compte(ligne):
     return {
         "id": _entier(ligne.get("id"), 1, 10**12, 0),
         "email": str(ligne.get("email") or "")[:254],
+        "pseudo": str(ligne.get("pseudo") or "")[:24],
         "premium": bool(ligne.get("premium")),
         "est_admin": bool(ligne.get("est_admin")),
+        "confirme": bool(ligne.get("confirme")),
         "quand": str(ligne.get("quand") or "")[:24],
     }
+
+
+def _lien_comptes(filtre, q):
+    params = {}
+    if filtre in ("abonnes", "admins", "attente"):
+        params["filtre"] = filtre
+    if q:
+        params["q"] = q
+    if not params:
+        return "/admin/comptes/"
+    return "/admin/comptes/?" + urlencode(params)
 
 
 @ensure_csrf_cookie
@@ -342,15 +362,36 @@ def comptes(request):
     refus = _garde(request)
     if refus:
         return refus
-    status, data = _api(request, "/api/admin/comptes/")
+    filtre = (request.GET.get("filtre") or "").strip()
+    if filtre not in ("abonnes", "admins", "attente"):
+        filtre = ""
+    q = " ".join((request.GET.get("q") or "").split())[:80]
+    chemin = _lien_comptes(filtre, q).replace("/admin/comptes/", "/api/admin/comptes/", 1)
+    status, data = _api(request, chemin)
     bounce = _refuser(request, status, data)
     if bounce:
         return bounce
-    ctx = _coquille(request, "comptes")
+    nav = "abonnes" if filtre == "abonnes" else "comptes"
+    ctx = _coquille(request, nav)
+    liens = {
+        "tous": _lien_comptes("", q),
+        "abonnes": _lien_comptes("abonnes", q),
+        "admins": _lien_comptes("admins", q),
+        "attente": _lien_comptes("attente", q),
+    }
     if status != 200:
         ctx["panne"] = data.get("message") or "Lecture impossible."
-        ctx["lignes"] = []
-        ctx["admins_n"] = 0
+        ctx.update(
+            {
+                "lignes": [],
+                "admins_n": 0,
+                "abonnes_n": 0,
+                "attente_n": 0,
+                "filtre": filtre,
+                "q": q,
+                "liens": liens,
+            }
+        )
         return _html(request, "admin/comptes.html", ctx)
     lignes = []
     for brute in data.get("comptes") or []:
@@ -361,6 +402,11 @@ def comptes(request):
         {
             "lignes": lignes,
             "admins_n": _entier(data.get("admins"), 0, 100000, 0),
+            "abonnes_n": _entier(data.get("abonnes"), 0, 100000, 0),
+            "attente_n": _entier(data.get("attente"), 0, 100000, 0),
+            "filtre": str(data.get("filtre") or filtre)[:16],
+            "q": str(data.get("q") or q)[:80],
+            "liens": liens,
         }
     )
     return _html(request, "admin/comptes.html", ctx)
@@ -387,7 +433,9 @@ def compte(request, pk):
         _flash(request, "Compte mis à jour.")
     else:
         _flash(request, data.get("message") or "Le compte n'a pas pu être modifié.", erreur=True)
-    return redirect("admin-comptes")
+    filtre = (request.POST.get("filtre") or "").strip()
+    q = " ".join((request.POST.get("q") or "").split())[:80]
+    return redirect(_lien_comptes(filtre, q))
 
 
 @ensure_csrf_cookie
@@ -397,28 +445,40 @@ def reglages(request):
     if refus:
         return refus
     if request.method == "POST":
+        fond = (request.POST.get("fond_defaut") or "satellite").strip()
+        if fond not in ("satellite", "routes"):
+            fond = ""
         saisi = {
             "duree_heures": (request.POST.get("duree_heures") or "").strip(),
             "seuil_degage": (request.POST.get("seuil_degage") or "").strip(),
             "plafond_heure": (request.POST.get("plafond_heure") or "").strip(),
+            "prix_premium": (request.POST.get("prix_premium") or "").strip(),
+            "fond_defaut": fond or "satellite",
+            "routes_actives": request.POST.get("routes_actives") == "1",
+            "inscriptions_ouvertes": request.POST.get("inscriptions_ouvertes") == "1",
         }
         duree = _borne_saisie(saisi["duree_heures"], 1, 12)
         seuil = _borne_saisie(saisi["seuil_degage"], 2, 5)
         plafond = _borne_saisie(saisi["plafond_heure"], 1, 24)
-        if None in (duree, seuil, plafond):
+        prix = _borne_saisie(saisi["prix_premium"], 0, 100000)
+        if None in (duree, seuil, plafond, prix) or fond not in ("satellite", "routes"):
             ctx = _coquille(request, "reglages")
-            ctx["erreur"] = "Vérifiez les bornes : durée 1–12 h, votes « dégagé » 2–5, plafond 1–24."
-            ctx["reglages"] = {
-                "duree_heures": saisi["duree_heures"] or 3,
-                "seuil_degage": saisi["seuil_degage"] or 2,
-                "plafond_heure": saisi["plafond_heure"] or 8,
-            }
+            ctx["erreur"] = "Vérifiez les bornes : durée 1–12 h, votes « dégagé » 2–5, plafond 1–24, prix 0–100 000 F."
+            ctx["reglages"] = saisi
             return _html(request, "admin/reglages.html", ctx)
         status, data = _api(
             request,
             "/api/admin/reglages/",
             method="POST",
-            payload={"duree_heures": duree, "seuil_degage": seuil, "plafond_heure": plafond},
+            payload={
+                "duree_heures": duree,
+                "seuil_degage": seuil,
+                "plafond_heure": plafond,
+                "prix_premium": prix,
+                "fond_defaut": fond,
+                "routes_actives": saisi["routes_actives"],
+                "inscriptions_ouvertes": saisi["inscriptions_ouvertes"],
+            },
         )
         bounce = _refuser(request, status, data)
         if bounce:
