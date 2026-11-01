@@ -658,7 +658,7 @@ body.sheet-dragging .grabber-arrow { animation-play-state: paused; }
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 12px 8px;
+  padding: 22px 12px 8px;
 }
 .feed-bar {
   position: sticky;
@@ -666,9 +666,23 @@ body.sheet-dragging .grabber-arrow { animation-play-state: paused; }
   z-index: 2;
   background: #fff;
   padding-bottom: 8px;
-  border-bottom-left-radius: 28px;
-  border-bottom-right-radius: 28px;
-  box-shadow: 0 1px 0 rgba(23, 23, 23, 0.04);
+}
+.feed-bar::before,
+.feed-bar::after {
+  content: "";
+  position: absolute;
+  bottom: -22px;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+.feed-bar::before {
+  left: 0;
+  background: radial-gradient(circle at 100% 100%, transparent 21px, #fff 22px);
+}
+.feed-bar::after {
+  right: 0;
+  background: radial-gradient(circle at 0 100%, transparent 21px, #fff 22px);
 }
 .item {
   width: 100%;
