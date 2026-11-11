@@ -7,3 +7,7 @@ venv/
 .DS_Store
 *.log
 staticfiles/
+
+deploy/vapid.local.env
+*.pem
+.vapid/

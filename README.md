@@ -82,8 +82,30 @@ Variables. Aucune n'est dans le dépôt. Les modèles vides sont `deploy/web.env
 | `WAYIZE_SQLITE_PATH` | API | autre chemin que `backend/db.sqlite3` |
 | `WAYIZE_SEED` | API | `0` pour ne pas insérer les signalements d'exemple à la première migration |
 | `DJANGO_DEBUG` | dev seulement | `0` coupe le mode debug. Ignoré par les modules `prod` |
+| `WAYIZE_VAPID_PUBLIC_KEY` | API | clé publique Web Push (notifications système hors onglet) |
+| `WAYIZE_VAPID_PRIVATE_KEY` | API | clé privée Web Push — **ne jamais committer** |
+| `WAYIZE_VAPID_SUBJECT` | API | contact VAPID, ex. `mailto:contact@exemple.com` |
 
-Générer une clé : `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Le mot de passe d'une `DATABASE_URL` se met entre les `:` et le `@`, encodé (un `@` dans le mot devient `%40`).
+Générer une clé Django : `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Le mot de passe d'une `DATABASE_URL` se met entre les `:` et le `@`, encodé (un `@` dans le mot devient `%40`).
+
+### Notifications téléphone (PWA)
+
+Les alertes natives passent par l’API Notification et le service worker (`showNotification`), pas par un compteur dans l’app. Sur un nouvel événement, le téléphone reçoit une notification système si l’autorisation est accordée (Compte → Alertes → Autoriser les notifications).
+
+Web Push (onglet fermé) demande une paire VAPID. En local :
+
+```powershell
+# Node
+npx web-push generate-vapid-keys
+# ou Python (écrit deploy/vapid.local.env, gitignoré)
+python deploy/generate_vapid_keys.py
+
+Get-Content deploy\vapid.local.env | ForEach-Object {
+  if ($_ -match '^([^#=]+)=(.*)$') { Set-Item "env:$($matches[1])" $matches[2] }
+}
+```
+
+Puis relancer l’API. Sans ces variables, l’installation PWA, le partage et les notifications locales (onglet ouvert / PWA installée) restent disponibles.
 
 Migration, depuis `backend`, avec les variables de l'API déjà posées :
 
@@ -144,7 +166,9 @@ L’en-tête de réponse `X-Request-Id` est le même des deux côtés, ce qui re
 - Administration sur `/admin/` : aperçu, signalements, comptes, durée de vie, seuil « dégagé » et plafond horaire. S'il n'y a pas encore d'administrateur, le premier compte qui se connecte le devient.
 - Tendance sur la durée de vie des alertes, en cercle, qui se déploie en barre.
 - États vide, chargement et erreur. Téléphone et bureau.
-- PWA : manifeste, service worker, icônes. Sur `localhost`, le navigateur peut proposer l’installation.
+- PWA : manifeste, service worker, icônes. Le bouton **Installer** n’apparaît que lorsque `beforeinstallprompt` est disponible et appelle `prompt()` ; une fois installée, l’état « installée » est affiché.
+- Partage d’un signalement (Web Share API, sinon copie du lien `#s-…`).
+- Notifications système via le service worker ; Web Push optionnel avec clés VAPID en environnement.
 
 Le fuseau horaire est `Africa/Libreville`. L’interface est en français.
 

@@ -255,6 +255,18 @@ def creer(request):
         lieu=signalement.lieu,
         commentaire_len=len(commentaire),
     )
+    try:
+        from .push import notifier_signalement
+
+        notifier_signalement(signalement)
+    except Exception as exc:  # noqa: BLE001 — la publication reste prioritaire
+        journal(
+            "signalements",
+            "push.error",
+            level="warning",
+            request_id=request_id(request),
+            error=type(exc).__name__,
+        )
     lieu_enregistre = memoiser_lieu(signalement.lieu, signalement.latitude, signalement.longitude)
     return reponse_signalement(request, signalement.pk, status=201, lieu=lieu_enregistre)
 

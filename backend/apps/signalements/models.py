@@ -39,3 +39,20 @@ class Signalement(models.Model):
 
     def __str__(self):
         return f"{self.get_type_display()} · {self.lieu}"
+
+
+class AbonnementPush(models.Model):
+    """Abonnement Web Push du navigateur. La clé privée VAPID reste dans l'environnement."""
+
+    endpoint = models.URLField(max_length=512, unique=True)
+    cle_p256dh = models.CharField(max_length=200)
+    cle_auth = models.CharField(max_length=120)
+    session_cle = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    cree_le = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "abonnement push"
+        verbose_name_plural = "abonnements push"
+
+    def __str__(self):
+        return self.endpoint[:64]
