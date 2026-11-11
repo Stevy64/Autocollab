@@ -62,7 +62,7 @@ WAYIZE_SEED=0
 
 `WAYIZE_SEED=0` empêche la première migration d’insérer les signalements d’exemple (Mont-Bouët, PK5, l’aéroport…). Sans cette variable, ils sont créés.
 
-Sans `WAYIZE_VAPID_PUBLIC_KEY` et `WAYIZE_VAPID_PRIVATE_KEY`, le site peut encore afficher une permission de notification, mais **aucun Push n’est envoyé** quand l’app est fermée. Sur un cluster, la procédure complète (Secret, rollout, téléphone) est la section **10.7** de [premier-cluster.md](premier-cluster.md).
+Sans `WAYIZE_VAPID_PUBLIC_KEY` et `WAYIZE_VAPID_PRIVATE_KEY`, le site peut encore afficher une permission de notification, mais **aucun Push n’est envoyé** quand l’app est fermée. Sur un cluster k3s, suivez le chemin linéaire **[10.7 Alertes téléphone en prod](premier-cluster.md#107-alertes-téléphone-en-prod)** de [premier-cluster.md](premier-cluster.md) (clés → `/etc/wayize/api.env` → Secret → rollout → migrate → `curl` → téléphone).
 
 `DATABASE_URL` reste absent tant qu’un seul processus API écrit dans SQLite. Le fichier est `backend/db.sqlite3`, ou le chemin `WAYIZE_SQLITE_PATH`. PostgreSQL est le magasin dès qu’il y a un deuxième processus API, un deuxième pod, ou une sauvegarde qui n’est pas une copie de fichier :
 

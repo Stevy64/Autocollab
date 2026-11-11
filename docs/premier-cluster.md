@@ -187,6 +187,8 @@ L’Ingress, plus bas, nomme l’hôte `wayize.gabomazone.com`, pointe vers le s
 
 Les noms de variables sont ceux de [docs/ovh-clusters.md](ovh-clusters.md). Sur ce cluster, `WAYIZE_API_URL` vaut `http://wayize-api:8648`, et `WAYIZE_API_HOSTS` nomme le service interne. L’API n’a pas d’Ingress. Le navigateur ne parle qu’au frontal, qui ajoute `X-Wayize-Session`.
 
+**Alertes téléphone.** Après que le site répond en HTTPS (fin de 10.5), les notifications système hors app se règlent à la section **[10.7 Alertes téléphone en prod](#107-alertes-téléphone-en-prod)** — un chemin unique, de la génération des clés jusqu’au test sur le téléphone.
+
 Deux façons de garder les données. Le reste (image, frontal, certificat, mise à jour) est le même.
 
 | | SQLite | Postgres |
@@ -441,7 +443,7 @@ Le fichier de l’API change selon le stockage.
 
 **SQLite** — un processus, un fichier. Pas de `DATABASE_URL`.
 
-Les trois lignes `WAYIZE_VAPID_*` restent commentées ici. Sans elles, le téléphone n’a pas d’alerte système quand Wayizé est fermée. Après le premier démarrage réussi, suivez la section **10.7 Notifications téléphone (Web Push)** pour les générer et les coller dans ce fichier.
+Les trois lignes `WAYIZE_VAPID_*` restent commentées ici. Sans elles, le téléphone n’a pas d’alerte système quand Wayizé est fermée. Après le premier démarrage réussi (site HTTPS OK), suivez la section **[10.7 Alertes téléphone en prod](#107-alertes-téléphone-en-prod)** — une seule suite de commandes.
 
 ```bash
 sudo tee /etc/wayize/api.env >/dev/null <<EOF
@@ -902,49 +904,125 @@ kubectl -n wayize set image deployment/wayize-web \
 
 Sur le chemin Postgres, le conteneur `migrate` est dans le Job, pas dans le Deployment : la première commande `set image` n’a alors que `api=...`.
 
-### 10.7 Notifications téléphone (Web Push)
+### 10.7 Alertes téléphone en prod
 
-Sans cette étape, le téléphone n’affiche une alerte que si Wayizé est ouverte. Pour une notification système (centre de notifications / barre d’état) **quand l’app est fermée**, l’API doit avoir une paire VAPID, le navigateur s’abonne, et chaque nouveau signalement envoie un Push.
+Cette section se fait **après** que `https://wayize.gabomazone.com/sante/` répond avec `"api": true` (fin de 10.5). Une seule fois. On reste sur le VPS, en SSH, sauf pour le test téléphone à la fin.
 
-**Limites plateforme.** Android Chrome : installer la PWA ou autoriser le site HTTPS, puis Activer les notifications. iPhone / iPad : iOS 16.4 ou plus, Wayizé **ajoutée à l’écran d’accueil** (Safari → Partager → Sur l’écran d’accueil) ; le Push ne marche pas dans un onglet Safari seul.
+Sans ces clés, le téléphone n’alerte que si Wayizé est ouverte à l’écran. Avec elles, une notification système peut arriver **même si l’app est fermée** (Web Push).
 
-Sur le VPS, une seule fois (ne collez jamais la clé privée dans git ni dans le chat) :
+| Où | Quoi |
+| --- | --- |
+| Fichier sur le VPS | `/etc/wayize/api.env` (mode 600, root) — on y ajoute trois lignes `WAYIZE_VAPID_*` |
+| Secret Kubernetes | `wayize-api` dans le namespace `wayize` — recopié depuis ce fichier |
+| Modèle dans le dépôt | `deploy/api.env.example` (ne pas y coller de vraies clés) |
+| Instance sans k3s | même variables ; voir [ovh-clusters.md](ovh-clusters.md) § Notifications téléphone |
+
+**Avant de commencer.** Ne collez jamais la clé privée dans git, dans un ticket ou dans le chat. Android Chrome : PWA ou site HTTPS + permission. iPhone / iPad : **iOS 16.4 ou plus**, et Wayizé **sur l’écran d’accueil** (Safari → Partager → Sur l’écran d’accueil) — un simple onglet Safari ne suffit pas.
+
+Faites les étapes **dans l’ordre**. Ne sautez pas.
+
+#### Étape A — Générer les clés
+
+Sur le VPS :
 
 ```bash
-# 1) Générer les clés (Node sur le VPS, ou depuis un PC puis coller)
 npx --yes web-push generate-vapid-keys
-# Notez Public Key et Private Key. Ou, depuis un clone :
-#   python3 deploy/generate_vapid_keys.py
-#   → lit deploy/vapid.local.env (fichier gitignoré)
+```
 
-# 2) Les coller dans /etc/wayize/api.env (décommentez et remplacez)
+L’écran affiche une **Public Key** et une **Private Key**. Gardez-les sous la main (bloc-notes local, pas un fichier du dépôt).
+
+Autre possibilité si Node n’est pas installé, depuis un clone du dépôt :
+
+```bash
+cd /srv/wayize   # ou le chemin de votre clone
+python3 deploy/generate_vapid_keys.py
+```
+
+Ça écrit `deploy/vapid.local.env` (fichier **gitignoré**). Ouvrez-le seulement pour copier les trois lignes, ne le committez pas.
+
+Ça a marché si vous avez deux longues chaînes (publique et privée), sans les avoir mises dans git.
+
+#### Étape B — Les coller dans `/etc/wayize/api.env`
+
+```bash
 sudoedit /etc/wayize/api.env
-# WAYIZE_VAPID_PUBLIC_KEY=...clé publique...
-# WAYIZE_VAPID_PRIVATE_KEY=...clé privée...
-# WAYIZE_VAPID_SUBJECT=mailto:contact@wayize.gabomazone.com
+```
 
-# 3) Recréer le Secret API et redémarrer (les autres variables restent dans le fichier)
+Dans l’éditeur, **ajoutez ou décommentez** exactement ces trois lignes (remplacez les points de suspension par vos clés ; une seule ligne chacune, sans espace autour du `=`) :
+
+```bash
+WAYIZE_VAPID_PUBLIC_KEY=...la_Public_Key...
+WAYIZE_VAPID_PRIVATE_KEY=...la_Private_Key...
+WAYIZE_VAPID_SUBJECT=mailto:contact@wayize.gabomazone.com
+```
+
+Laissez intactes les autres lignes déjà présentes (`DJANGO_SECRET_KEY`, `DATABASE_URL` ou `WAYIZE_SQLITE_PATH`, etc.). Enregistrez et quittez.
+
+Ça a marché si `sudo grep WAYIZE_VAPID /etc/wayize/api.env` montre les trois noms (les valeurs restent sur le VPS).
+
+#### Étape C — Recréer le Secret et redémarrer l’API
+
+Le pod ne lit pas le fichier directement : il lit le Secret `wayize-api`. On le recrée depuis le fichier, puis on redémarre l’API.
+
+```bash
 sudo k3s kubectl -n wayize delete secret wayize-api
 sudo k3s kubectl -n wayize create secret generic wayize-api --from-env-file=/etc/wayize/api.env
 kubectl -n wayize rollout restart deployment/wayize-api
 kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
+```
 
-# 4) Migration si le pod n'a pas encore la table des abonnements
+(`sudo k3s kubectl` pour lire `/etc/wayize/api.env` en mode 600 ; le `rollout` peut rester sans `sudo` si votre compte y a droit.)
+
+Ça a marché si le `rollout status` se termine par `successfully rolled out`.
+
+#### Étape D — Migration
+
+La table des abonnements Push doit exister.
+
+**SQLite** (un pod API, volume) :
+
+```bash
 kubectl -n wayize exec deploy/wayize-api -- python manage.py migrate --noinput
-# (chemin Postgres : lancez plutôt le Job wayize-migrate comme en 10.4)
+```
 
-# 5) Vérifier — "push" doit être true
+**Postgres** (Job de l’étape 10.4) :
+
+```bash
+kubectl -n wayize delete job wayize-migrate --ignore-not-found
+kubectl apply -f "$HOME/k8s/wayize-api.yaml"
+kubectl -n wayize wait --for=condition=complete job/wayize-migrate --timeout=180s
+```
+
+Ça a marché si la commande se termine sans erreur rouge.
+
+#### Étape E — Contrôle `"push": true`
+
+```bash
 curl -fsS https://wayize.gabomazone.com/api/notifications/etat/
 curl -fsS https://wayize.gabomazone.com/sante/
 ```
 
-Sur le téléphone :
+Ça a marché si la première réponse contient `"push": true` (et une `vapid_public` non vide). La seconde doit aussi montrer `"push": true`.
 
-1. Ouvrir `https://wayize.gabomazone.com/`, installer Wayizé (ou Sur l’écran d’accueil sur iPhone).
-2. Compte → Alertes → **Autoriser les notifications téléphone** → Accepter.
-3. Fermer complètement l’app, publier un signalement depuis un autre appareil (ou l’admin), et vérifier la notification système.
+Si vous lisez `"push": false` : les clés ne sont pas arrivées dans le pod. Vérifiez le fichier, recréez le Secret (étape C), puis :
 
-Si `etat` répond `"push": false`, les clés ne sont pas dans le pod : `kubectl -n wayize exec deploy/wayize-api -- printenv | grep WAYIZE_VAPID` (la privée apparaît : ne la copiez nulle part). Si `push` est true mais rien n’arrive : réinstallez la PWA, réactivez les notifications, puis `kubectl -n wayize logs deploy/wayize-api | grep push`.
+```bash
+kubectl -n wayize exec deploy/wayize-api -- printenv | grep WAYIZE_VAPID
+```
+
+(La clé privée s’affiche : ne la copiez nulle part.)
+
+#### Étape F — Téléphone : installer, autoriser, tester
+
+1. Ouvrez `https://wayize.gabomazone.com/` sur le téléphone.
+2. **Installer** Wayizé (bouton Installer, ou sur iPhone : Partager → Sur l’écran d’accueil). Rouvrez l’icône installée.
+3. Compte → panneau **Alertes** → **Autoriser les notifications téléphone** → Accepter dans la boîte du système.
+4. Fermez complètement Wayizé (pas seulement un onglet en arrière-plan).
+5. Depuis un autre appareil (ou l’admin), publiez un signalement. Le téléphone doit montrer une notification système (centre de notifications / barre d’état), pas seulement un toast dans l’app.
+
+Ça a marché si la notification système apparaît alors que Wayizé est fermée.
+
+Si `"push": true` mais rien n’arrive : réinstallez la PWA, refaites l’autorisation, puis regardez `kubectl -n wayize logs deploy/wayize-api | grep push` (événements `push.subscribed` / `push.sent` / `push.error`).
 
 ## 11. L’application suivante
 
