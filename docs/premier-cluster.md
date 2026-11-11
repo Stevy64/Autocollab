@@ -12,7 +12,7 @@ Vous n’avez pas besoin d’avoir déjà utilisé Kubernetes. Les mots qui revi
 
 k3s est le bon choix ici : c’est un Kubernetes complet en un seul programme, prévu pour une petite machine, et il amène déjà Traefik pour recevoir les sous-domaines.
 
-Lisez ce guide de haut en bas. Les étapes 1 à 7 préparent la machine, une seule fois. L’étape 8 crée le tiroir de Wayizé, l’étape 9 son nom de domaine, l’étape 10 l’installe. À l’étape 10.1 on **construit l’image sur le VPS** (pas de registre GHCR). Continuez ensuite à 10.2. Ne revenez pas en arrière. L’étape 11 envoie vers le guide de l’application suivante. Chacun de ces guides a sa propre suite 1, 2, 3, et ne reprend pas les numéros de celui-ci.
+Lisez ce guide de haut en bas. Les étapes 1 à 7 préparent la machine, une seule fois. L’étape 8 crée le tiroir de Wayizé, l’étape 9 son nom de domaine, l’étape 10 l’installe. À l’étape **[10.1 Image locale sur le VPS (sans GHCR)](#101-image-locale-sur-le-vps-sans-ghcr)** : construire → importer dans k3s → pointer les Deployments (A → B → C). Continuez ensuite à 10.2. Ne revenez pas en arrière. L’étape 11 envoie vers le guide de l’application suivante. Chacun de ces guides a sa propre suite 1, 2, 3, et ne reprend pas les numéros de celui-ci.
 
 Dans le terminal, on ne colle que le contenu d’un bloc de commandes (le cadre gris), puis on attend qu’il se termine. Les titres, les phrases et les lignes « Ça a marché si » ne sont pas des commandes. Si le shell répond `command not found` sur un mot français, ce mot a été collé par erreur : on l’ignore, on n’installe rien.
 
@@ -201,15 +201,20 @@ Deux façons de garder les données. Le reste (image, frontal, certificat, mise 
 
 Si vous restez sur un seul processus, suivez les blocs **SQLite** et sautez la section 10.2. Si vous voulez Postgres pour Wayizé, faites la section 10.2 avant les blocs **Postgres**. Les applications de l’étape 11 utilisent ce même Postgres : ne sautez la section 10.2 que si Wayizé reste seul sur ce VPS.
 
-### 10.1 Obtenir l’image (sur le VPS, sans registre)
+### 10.1 Image locale sur le VPS (sans GHCR)
 
-**Pas de GHCR.** On ne tire pas `ghcr.io/stevy64/wayize:…`. On construit l’image sur le VPS, on l’importe dans k3s, et les Deployments utilisent l’étiquette locale `wayize:local` avec `imagePullPolicy: Never`. Aucun jeton de registre, aucun `imagePullSecrets`.
+**Pas de registre.** On ne tire jamais `ghcr.io/stevy64/wayize:main`. On construit l’image sur le VPS avec `deploy/Dockerfile.wayize`, on l’importe dans k3s, puis les Deployments `wayize-api` et `wayize-web` pointent vers `docker.io/library/wayize:local` avec `imagePullPolicy: Never`. Aucun jeton GHCR, aucun `imagePullSecrets`.
 
-Le fichier de construction est `deploy/Dockerfile.wayize` (utilisateur non root `app`, uid 10001). Docker (ou buildah) ne sert qu’à construire ; les pods restent ceux de k3s. L’image nginx des manifests ne change pas.
+Faites les étapes **A → B → C** dans l’ordre, en SSH sur le VPS. L’image nginx des manifests ne change pas.
 
-#### Construire et importer
+| | |
+| --- | --- |
+| Dépôt | [Stevy64/Wayize](https://github.com/Stevy64/Wayize) cloné dans `/srv/wayize` |
+| Dockerfile | `/srv/wayize/deploy/Dockerfile.wayize` |
+| Étiquette locale | `wayize:local` → dans k3s : `docker.io/library/wayize:local` |
+| Politique | `imagePullPolicy: Never` (k3s n’interroge pas Internet pour cette image) |
 
-Si `/srv/wayize` existe déjà, ne clonez pas une seconde fois. Le dépôt applicatif est [Stevy64/Wayize](https://github.com/Stevy64/Wayize).
+#### Étape A — Construire l’image sur le VPS
 
 ```bash
 sudo apt install -y docker.io
@@ -221,8 +226,6 @@ fi
 cd /srv/wayize
 git pull --ff-only
 sudo docker build -f deploy/Dockerfile.wayize -t wayize:local .
-sudo docker save wayize:local | sudo k3s ctr images import -
-sudo k3s ctr images ls | grep wayize
 ```
 
 Sans Docker, avec buildah :
@@ -231,87 +234,91 @@ Sans Docker, avec buildah :
 sudo apt install -y buildah
 cd /srv/wayize
 sudo buildah bud -f deploy/Dockerfile.wayize -t docker.io/library/wayize:local .
+```
+
+Ça a marché si la commande `build` / `bud` se termine sans erreur.
+
+#### Étape B — Importer l’image dans k3s
+
+Docker ne partage pas son magasin d’images avec k3s. Il faut **exporter** :
+
+```bash
+sudo docker save wayize:local | sudo k3s ctr images import -
+sudo k3s ctr images ls | grep wayize
+```
+
+Avec buildah :
+
+```bash
 sudo buildah push docker.io/library/wayize:local docker-archive:/tmp/wayize-local.tar
 sudo k3s ctr images import /tmp/wayize-local.tar
 rm -f /tmp/wayize-local.tar
 sudo k3s ctr images ls | grep wayize
 ```
 
-Ça a marché si `grep` affiche `docker.io/library/wayize:local` (ou un nom équivalent contenant `wayize:local`).
+Ça a marché si `grep` affiche une ligne contenant `wayize:local` (souvent `docker.io/library/wayize:local`).
 
-Les manifests des étapes 10.4 et 10.5 utilisent déjà :
+Les YAML des étapes 10.4 et 10.5 utilisent déjà :
 
 ```yaml
 image: docker.io/library/wayize:local
 imagePullPolicy: Never
 ```
 
-`Never` interdit à k3s d’interroger Internet pour cette image : elle doit figurer dans `k3s ctr images ls` **avant** le démarrage des pods.
+Si vous **créez** le cluster pour la première fois : terminez B, puis passez à **10.2** (les `kubectl apply` des 10.4 / 10.5 prendront l’image locale).  
+Si les Deployments existent déjà et tirent encore `ghcr.io` (pods en `ImagePullBackOff`) : enchaînez tout de suite sur **l’étape C**.
 
-Passez à l’étape 10.2.
+#### Étape C — Pointer wayize-api et wayize-web, puis rollout
 
-#### Bloqué maintenant : `ImagePullBackOff` sur `ghcr.io/stevy64/wayize:main`
-
-Si les pods affichent `ImagePullBackOff` / `ErrImagePull` et que `kubectl -n wayize describe pod …` cite `ghcr.io/stevy64/wayize:main`, le cluster essaie encore le registre. On arrête ça : construire en local, importer, puis **forcer** les Deployments (et le Job migrate s’il existe) vers `wayize:local`.
-
-Collez ce bloc **tel quel** sur le VPS (SSH) :
+Cette étape force les deux Deployments à oublier GHCR. Collez le bloc **tel quel**.
 
 ```bash
-cd /srv/wayize
-git pull --ff-only
-sudo apt install -y docker.io
-sudo docker build -f deploy/Dockerfile.wayize -t wayize:local .
-sudo docker save wayize:local | sudo k3s ctr images import -
-sudo k3s ctr images ls | grep wayize
-
-# API (conteneur api ; + migrate si le Deployment SQLite l’embarque)
+# --- wayize-api (conteneur api ; + migrate sur le chemin SQLite) ---
 kubectl -n wayize set image deployment/wayize-api \
   api=docker.io/library/wayize:local \
   migrate=docker.io/library/wayize:local
+
 kubectl -n wayize patch deployment wayize-api --type=json -p='[
-  {"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"},
-  {"op":"replace","path":"/spec/template/spec/initContainers/0/imagePullPolicy","value":"Never"}
-]' 2>/dev/null || kubectl -n wayize patch deployment wayize-api --type=json -p='[
   {"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"}
 ]'
+# S'il y a un initContainer migrate (SQLite), forcer Never aussi :
+kubectl -n wayize patch deployment wayize-api --type=json -p='[
+  {"op":"replace","path":"/spec/template/spec/initContainers/0/imagePullPolicy","value":"Never"}
+]' 2>/dev/null || true
 
-# Frontal (static + gunicorn)
+# --- wayize-web (static + gunicorn) ---
 kubectl -n wayize set image deployment/wayize-web \
   static=docker.io/library/wayize:local \
   gunicorn=docker.io/library/wayize:local
+
 kubectl -n wayize patch deployment wayize-web --type=json -p='[
   {"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"},
   {"op":"replace","path":"/spec/template/spec/containers/1/imagePullPolicy","value":"Never"}
 ]'
 
-# Job migrate Postgres (s’il existe) : à relancer avec la bonne image
-if kubectl -n wayize get job wayize-migrate >/dev/null 2>&1; then
-  kubectl -n wayize delete job wayize-migrate --ignore-not-found
-fi
+# Ancien Job migrate Postgres (sinon il reprendrait une vieille image)
+kubectl -n wayize delete job wayize-migrate --ignore-not-found
+kubectl -n wayize delete secret ghcr --ignore-not-found
 
-kubectl -n wayize delete pods -l app=wayize-api --force --grace-period=0 2>/dev/null || true
-kubectl -n wayize delete pods -l app=wayize-web --force --grace-period=0 2>/dev/null || true
+# Relancer les pods et attendre le rollout
+kubectl -n wayize delete pods -l 'app in (wayize-api,wayize-web)' --force --grace-period=0 2>/dev/null || true
 kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
 kubectl -n wayize rollout status deployment/wayize-web --timeout=180s
 kubectl -n wayize get pods
 ```
 
-Si le patch `initContainers` échoue parce qu’il n’y en a pas (chemin Postgres), c’est normal : le second `patch` (conteneur seul) suffit pour l’API.
+Ça a marché si les deux `rollout status` se terminent par `successfully rolled out`, et si `get pods` montre `Running` **sans** `ImagePullBackOff` / `ErrImagePull`.
 
-Ça a marché si `get pods` montre `Running` / `1/1` (ou `2/2` pour le web) **sans** `ImagePullBackOff`, et si :
-
-```bash
-kubectl -n wayize get deploy wayize-api wayize-web -o wide
-kubectl -n wayize get deploy -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.template.spec.containers[*]}{.image}{" "}{.imagePullPolicy}{"\n"}{end}{end}'
-```
-
-affiche `docker.io/library/wayize:local` et `Never` (plus de `ghcr.io`).
-
-Retirez aussi un éventuel secret de registre devenu inutile :
+Contrôle final (plus aucune ligne `ghcr.io`) :
 
 ```bash
-kubectl -n wayize delete secret ghcr --ignore-not-found
+kubectl -n wayize get deploy wayize-api wayize-web \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{range .spec.template.spec.containers[*]}  {.name}{"\t"}{.image}{"\t"}{.imagePullPolicy}{"\n"}{end}{end}'
 ```
+
+Chaque conteneur doit afficher `docker.io/library/wayize:local` et `Never`.
+
+**Si le rollout C échoue encore** : revenez en A puis B (`docker build` + `docker save | k3s ctr images import`), vérifiez `sudo k3s ctr images ls | grep wayize:local`, puis rejouez C. Sans l’import (étape B), `Never` laisse le pod en erreur parce que l’image n’existe pas dans k3s.
 
 ### 10.2 Postgres du cluster
 
