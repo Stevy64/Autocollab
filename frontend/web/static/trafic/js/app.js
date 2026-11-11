@@ -416,9 +416,16 @@ function precisionsCourt(n) {
 }
 
 function messageFrom(error, fallback) {
-  if (error && error.status === 403) return "La session a expiré. Rechargez la page pour publier.";
+  if (error && error.status === 403) {
+    return (error.data && error.data.message)
+      || "La session a expiré. Rechargez la page, puis réessayez.";
+  }
   if (error && error.status === 0) return "Pas de connexion. Réessayez dès que le réseau revient.";
-  if (error && error.data && error.data.message) return error.data.message;
+  if (error && error.data && error.data.message) return String(error.data.message);
+  if (error && error.status >= 400) return `${fallback} (${error.status})`;
+  if (error && error.message && error.message !== "http" && error.message !== "network") {
+    return String(error.message).slice(0, 180);
+  }
   return fallback;
 }
 
@@ -437,7 +444,16 @@ async function api(url, options = {}) {
   const headers = { Accept: "application/json" };
   const jeton = state.jeton || "";
   if (/^[a-f0-9]{32}$/.test(jeton)) headers["X-Wayize-Compte"] = jeton;
-  if (method !== "GET" && method !== "HEAD") headers["X-CSRFToken"] = csrf();
+  if (method !== "GET" && method !== "HEAD") {
+    const jetonCsrf = csrf();
+    if (!jetonCsrf) {
+      const failure = new Error("Jeton CSRF manquant. Rechargez la page.");
+      failure.status = 403;
+      failure.data = { message: "Jeton CSRF manquant. Rechargez la page." };
+      throw failure;
+    }
+    headers["X-CSRFToken"] = jetonCsrf;
+  }
   if (options.body) headers["Content-Type"] = "application/json";
   let response;
   try {
@@ -453,9 +469,21 @@ async function api(url, options = {}) {
     failure.data = {};
     throw failure;
   }
-  const data = await response.json().catch(() => ({}));
+  const brut = await response.text();
+  let data = {};
+  if (brut) {
+    try {
+      data = JSON.parse(brut);
+    } catch (error) {
+      if (response.status === 403) {
+        data = { message: "Jeton CSRF refusé. Rechargez la page, puis réessayez." };
+      } else if (!response.ok) {
+        data = { message: `Erreur serveur (${response.status}).` };
+      }
+    }
+  }
   if (!response.ok) {
-    const failure = new Error("http");
+    const failure = new Error((data && data.message) || "http");
     failure.status = response.status;
     failure.data = data;
     throw failure;
@@ -1585,6 +1613,16 @@ async function partagerSignalement(id) {
   window.prompt("Copiez le lien du signalement :", url);
 }
 
+function nettoyerCleVapid(brut) {
+  let cle = String(brut || "").trim();
+  if ((cle.startsWith("\"") && cle.endsWith("\"")) || (cle.startsWith("'") && cle.endsWith("'"))) {
+    cle = cle.slice(1, -1).trim();
+  }
+  cle = cle.replace(/\s+/g, "");
+  if (!cle || cle.includes("BEGIN") || cle.includes("-----")) return "";
+  return cle;
+}
+
 function urlBase64VersUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -1592,6 +1630,25 @@ function urlBase64VersUint8Array(base64String) {
   const sortie = new Uint8Array(brut.length);
   for (let i = 0; i < brut.length; i += 1) sortie[i] = brut.charCodeAt(i);
   return sortie;
+}
+
+function cleVapidVersApplicationServerKey(brut) {
+  const cle = nettoyerCleVapid(brut);
+  if (!cle) throw new Error("Clé VAPID absente ou illisible.");
+  let bytes;
+  try {
+    bytes = urlBase64VersUint8Array(cle);
+  } catch (error) {
+    throw new Error("Clé VAPID illisible (base64).");
+  }
+  // Point P-256 non compressé : 0x04 + X(32) + Y(32).
+  if (bytes.length !== 65) {
+    throw new Error(`Clé VAPID incorrecte (${bytes.length} octets, 65 attendus).`);
+  }
+  if (bytes[0] !== 4) {
+    throw new Error("Clé VAPID : format de point non compressé attendu.");
+  }
+  return bytes;
 }
 
 async function notifierOS(phrase, options) {
@@ -1622,17 +1679,22 @@ async function notifierOS(phrase, options) {
 }
 
 async function lireVapidPublic() {
-  let cle = String(reglagesCarte().vapid_public || "").trim();
-  if (cle) return cle;
+  let cle = nettoyerCleVapid(reglagesCarte().vapid_public || "");
+  if (cle) {
+    if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
+    boot.reglages.vapid_public = cle;
+    return cle;
+  }
   try {
     const data = await api("/api/notifications/etat/");
     if (data) {
       if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
       boot.reglages.push = !!data.push;
       if (typeof data.abonnements === "number") boot.reglages.abonnements = data.abonnements;
-      if (data.vapid_public) {
-        boot.reglages.vapid_public = data.vapid_public;
-        return String(data.vapid_public).trim();
+      cle = nettoyerCleVapid(data.vapid_public || "");
+      if (cle) {
+        boot.reglages.vapid_public = cle;
+        return cle;
       }
     }
   } catch (error) {
@@ -1650,6 +1712,21 @@ function pushDisponibleNavigateur() {
   return true;
 }
 
+function payloadAbonnement(sub) {
+  const json = sub && typeof sub.toJSON === "function" ? sub.toJSON() : null;
+  const endpoint = (json && json.endpoint) || (sub && sub.endpoint) || "";
+  const keys = (json && json.keys) || {};
+  const p256dh = keys.p256dh || "";
+  const auth = keys.auth || "";
+  if (!endpoint || !p256dh || !auth) {
+    throw new Error("Abonnement Push incomplet (endpoint ou clés manquants).");
+  }
+  return {
+    endpoint: String(endpoint),
+    keys: { p256dh: String(p256dh), auth: String(auth) },
+  };
+}
+
 async function abonnerPush(options) {
   const silencieux = options && options.silencieux;
   if (!("Notification" in window) || Notification.permission !== "granted") {
@@ -1661,11 +1738,20 @@ async function abonnerPush(options) {
     }
     return { ok: false, raison: "navigateur" };
   }
-  const cle = await lireVapidPublic();
+  // Préférer la clé déjà en mémoire (boot / etat) pour limiter les awaits avant subscribe.
+  let cle = nettoyerCleVapid(reglagesCarte().vapid_public || "");
+  if (!cle) cle = await lireVapidPublic();
   if (!cle) {
     if (!silencieux) {
       toast("Le serveur n'a pas encore les clés VAPID. Les alertes téléphone resteront inactives.");
     }
+    return { ok: false, raison: "vapid" };
+  }
+  let applicationServerKey;
+  try {
+    applicationServerKey = cleVapidVersApplicationServerKey(cle);
+  } catch (error) {
+    if (!silencieux) toast(messageFrom(error, "Clé VAPID invalide sur le serveur."));
     return { ok: false, raison: "vapid" };
   }
   try {
@@ -1673,40 +1759,53 @@ async function abonnerPush(options) {
       await navigator.serviceWorker.register("/sw.js");
     }
     const reg = await navigator.serviceWorker.ready;
+    if (!reg.pushManager) {
+      throw new Error("PushManager indisponible sur ce navigateur.");
+    }
     let sub = await reg.pushManager.getSubscription();
     let cleConnue = "";
-    try { cleConnue = localStorage.getItem("wayize.vapid.public") || ""; } catch (error) { cleConnue = ""; }
+    try { cleConnue = nettoyerCleVapid(localStorage.getItem("wayize.vapid.public") || ""); } catch (error) { cleConnue = ""; }
     if (sub && cleConnue && cleConnue !== cle) {
-      await sub.unsubscribe();
+      try { await sub.unsubscribe(); } catch (error) { /* ignore */ }
       sub = null;
     }
     if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64VersUint8Array(cle),
+      try {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+      } catch (error) {
+        const detail = (error && (error.message || error.name)) || "refus du navigateur";
+        throw new Error(`Inscription Push refusée : ${detail}`);
+      }
+    }
+    const corps = payloadAbonnement(sub);
+    let enregistre;
+    try {
+      enregistre = await api("/api/notifications/abonnement/", {
+        method: "POST",
+        body: JSON.stringify(corps),
       });
+    } catch (error) {
+      try { await sub.unsubscribe(); } catch (ignore) { /* ignore */ }
+      throw error;
     }
-    const json = sub.toJSON();
-    if (!json || !json.endpoint || !json.keys || !json.keys.p256dh || !json.keys.auth) {
-      throw new Error("Abonnement Push incomplet.");
-    }
-    const enregistre = await api("/api/notifications/abonnement/", {
-      method: "POST",
-      body: JSON.stringify(json),
-    });
     try { localStorage.setItem("wayize.vapid.public", cle); } catch (error) { /* ignore */ }
     memoriserPushActif(true);
     if (enregistre && typeof enregistre.abonnements === "number") {
       if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
       boot.reglages.push = true;
+      boot.reglages.vapid_public = cle;
       boot.reglages.abonnements = enregistre.abonnements;
     }
     return { ok: true, abonnements: enregistre && enregistre.abonnements };
   } catch (error) {
+    memoriserPushActif(false);
     if (!silencieux) {
       toast(messageFrom(error, "L'abonnement aux notifications a échoué."));
     }
-    return { ok: false, raison: "erreur" };
+    return { ok: false, raison: "erreur", error };
   }
 }
 
@@ -1767,9 +1866,8 @@ async function demanderNotifications(options) {
   const resultat = await Notification.requestPermission();
   if (resultat === "granted") {
     const abo = await abonnerPush({ silencieux });
-    if (!silencieux) {
-      toast(abo.ok ? "Alertes sur la route activées." : "Permission OK, mais l'abonnement a échoué.");
-    }
+    // abonnerPush a déjà toasté l'erreur détaillée si besoin.
+    if (!silencieux && abo.ok) toast("Alertes sur la route activées.");
     if (!abo.ok) memoriserPushActif(false);
   } else {
     memoriserPushActif(false);

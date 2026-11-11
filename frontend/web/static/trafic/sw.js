@@ -1,12 +1,12 @@
-const CACHE = "wayize-shell-v7";
+const CACHE = "wayize-shell-v8";
 const TILES = "wayize-tiles-v3";
 const TILE_LIMIT = 120;
 const SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/static/trafic/css/app.css?v=20261112a",
-  "/static/trafic/js/app.js?v=20261112a",
-  "/static/trafic/js/quartiers.js?v=20261112a",
+  "/static/trafic/css/app.css?v=20261112b",
+  "/static/trafic/js/app.js?v=20261112b",
+  "/static/trafic/js/quartiers.js?v=20261112b",
   "/static/trafic/vendor/leaflet/leaflet.css",
   "/static/trafic/vendor/leaflet/leaflet.js",
   "/static/trafic/icons/icon-192.png",

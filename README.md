@@ -90,24 +90,36 @@ Générer une clé Django : `python -c "import secrets; print(secrets.token_urls
 
 ### Notifications téléphone (PWA)
 
-Les alertes natives passent par l’API Notification et le service worker (`showNotification`), pas par un compteur dans l’app. Sur un nouvel événement, le téléphone reçoit une notification système si l’autorisation est accordée (Compte → Alertes → Autoriser les notifications).
+Sur la carte, l’interrupteur **Alertes sur la route** (sous « En ce moment ») active le Web Push **sans compte**. Chrome exige un contexte sécurisé : `http://127.0.0.1:8647` et `http://localhost:8647` sont OK ; une IP LAN en `http://` ne l’est pas.
 
-Web Push (onglet fermé) demande une paire VAPID. En local :
+Web Push demande une paire VAPID **dans le processus API (:8648)**. Sans ces variables, le bouton peut s’afficher après un `etat` trompeur, ou l’abonnement échoue.
+
+**Local (PowerShell), avant de lancer l’API :**
 
 ```powershell
-# Node
-npx web-push generate-vapid-keys
-# ou Python (écrit deploy/vapid.local.env, gitignoré)
-python deploy/generate_vapid_keys.py
+# Une fois : générer (écrit deploy/vapid.local.env, gitignoré)
+.\.venv\Scripts\python.exe deploy\generate_vapid_keys.py
 
+# À chaque terminal API : charger les clés, puis démarrer :8648
 Get-Content deploy\vapid.local.env | ForEach-Object {
   if ($_ -match '^([^#=]+)=(.*)$') { Set-Item "env:$($matches[1])" $matches[2] }
 }
+cd backend
+python manage.py runserver 127.0.0.1:8648
 ```
 
-Puis relancer l’API. Sans ces variables, l’installation PWA, le partage et les notifications locales (onglet ouvert) restent disponibles, mais **aucun Push n’arrive sur le téléphone quand l’app est fermée**.
+Contrôle :
 
-En production (`wayize.gabomazone.com`), les clés doivent être dans le Secret Kubernetes / `/etc/wayize/api.env`, puis `migrate` et un redémarrage de l’API. Checklist VPS : [docs/premier-cluster.md](docs/premier-cluster.md) §10.7. Contrôle : `curl -fsS https://wayize.gabomazone.com/api/notifications/etat/` → `"push": true`. Android Chrome : PWA + permission. iPhone : iOS ≥ 16.4 et Wayizé sur l’écran d’accueil.
+```powershell
+Invoke-WebRequest http://127.0.0.1:8648/api/notifications/etat/ | Select-Object -Expand Content
+# attendu : "push": true, "vapid_public": "B…", "abonnements": N
+```
+
+Sur la carte (`:8647`), activez **Alertes sur la route**, acceptez la permission, puis revérifiez `abonnements` (doit monter). Couper l’interrupteur retire l’`AbonnementPush`.
+
+Sans VAPID, l’installation PWA et les toasts locaux restent possibles, mais **aucun Push n’arrive quand l’app est fermée**.
+
+En production (`wayize.gabomazone.com`), les clés sont dans le Secret Kubernetes / `/etc/wayize/api.env`, puis `migrate` et redémarrage API. Checklist : [docs/premier-cluster.md](docs/premier-cluster.md) §10.7.
 
 Migration, depuis `backend`, avec les variables de l'API déjà posées :
 
