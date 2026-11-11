@@ -1,4 +1,4 @@
-const CACHE = "wayize-shell-v5";
+const CACHE = "wayize-shell-v6";
 const TILES = "wayize-tiles-v3";
 const TILE_LIMIT = 120;
 const SHELL = [

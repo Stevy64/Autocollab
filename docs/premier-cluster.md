@@ -1030,7 +1030,7 @@ kubectl -n wayize exec deploy/wayize-api -- printenv | grep WAYIZE_VAPID
 
 1. Ouvrez `https://wayize.gabomazone.com/` sur le téléphone (**sans compte** : la session anonyme suffit).
 2. **Installer** Wayizé (bouton Installer, ou sur iPhone : Partager → Sur l’écran d’accueil). Rouvrez l’icône installée — un simple onglet Safari **ne reçoit pas** le Push.
-3. Sur la **carte** (liste « En ce moment »), touchez **Autoriser les notifications** → Accepter dans la boîte du système. Pas besoin d’ouvrir Compte ni Premium. Android Chrome : site HTTPS ou PWA + permission suffisent.
+3. Sur la **carte** (liste « En ce moment »), activez l’interrupteur **Alertes sur la route** → Accepter dans la boîte du système. Pour couper : désactivez le même interrupteur (ça retire l’abonnement Push). Pas besoin d’ouvrir Compte ni Premium. Android Chrome : site HTTPS ou PWA + permission suffisent.
 4. Vérifiez que l’abonnement est en base (sinon `push.skip` avec `aucun_abonnement`) :
 
 ```bash

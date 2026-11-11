@@ -6,7 +6,14 @@ from apps.identite import cle_session
 from apps.journal import journal, request_id
 
 from .models import AbonnementPush
-from .push import enregistrer, envoyer_a_tous, nombre_abonnements, pret, vapid_public
+from .push import (
+    enregistrer,
+    envoyer_a_tous,
+    nombre_abonnements,
+    pret,
+    retirer,
+    vapid_public,
+)
 
 
 @require_GET
@@ -23,9 +30,9 @@ def etat(request):
 
 
 @protege("signalements")
-@require_http_methods(["POST"])
+@require_http_methods(["POST", "DELETE"])
 def abonnement(request):
-    """Enregistre un Push anonyme. Pas de compte : la session X-Wayize-Session suffit."""
+    """Active ou coupe le Push anonyme. Session X-Wayize-Session suffit (pas de compte)."""
     if not pret():
         return erreur(
             "Les notifications téléphone ne sont pas configurées sur ce serveur "
@@ -35,6 +42,23 @@ def abonnement(request):
     data, message = lire_json(request)
     if data is None:
         return erreur(message)
+    if not isinstance(data, dict):
+        data = {}
+
+    actif = data.get("actif", True)
+    if request.method == "DELETE" or actif is False or str(actif).lower() in ("0", "false", "off"):
+        endpoint = data.get("endpoint") or ""
+        session = cle_session(request)
+        n = retirer(endpoint, session)
+        journal(
+            "signalements",
+            "push.unsubscribed",
+            request_id=request_id(request),
+            retires=n,
+            abonnements=nombre_abonnements(),
+        )
+        return reponse({"ok": True, "actif": False, "retires": n, "abonnements": nombre_abonnements()})
+
     endpoint = data.get("endpoint")
     keys = data.get("keys") if isinstance(data.get("keys"), dict) else {}
     abo, probleme, cree = enregistrer(
@@ -56,6 +80,7 @@ def abonnement(request):
     return reponse(
         {
             "ok": True,
+            "actif": True,
             "vapid_public": vapid_public() or None,
             "abonnements": nombre_abonnements(),
             "cree": bool(cree),
@@ -110,7 +135,7 @@ def admin_test(request):
     if nombre_abonnements() == 0:
         return erreur(
             "Aucun téléphone abonné. Sur le téléphone : ouvrir la carte, "
-            "toucher Autoriser les notifications (sans compte).",
+            "activer les notifications (sans compte).",
             status=400,
         )
     data, _message = lire_json(request)

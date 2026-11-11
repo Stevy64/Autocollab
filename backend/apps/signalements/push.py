@@ -50,6 +50,19 @@ def enregistrer(endpoint, p256dh, auth, session_cle=""):
     return abo, "", cree
 
 
+def retirer(endpoint="", session_cle=""):
+    """Supprime l'abonnement Push (désactivation). Retourne le nombre d'enregistrements retirés."""
+    endpoint = (endpoint or "").strip()
+    session_cle = (session_cle or "").strip()[:64]
+    if endpoint.startswith("https://"):
+        n, _ = AbonnementPush.objects.filter(endpoint=endpoint).delete()
+        return n
+    if session_cle:
+        n, _ = AbonnementPush.objects.filter(session_cle=session_cle).delete()
+        return n
+    return 0
+
+
 def _payload(titre, corps, url="/", tag="wayize-push"):
     return json.dumps(
         {

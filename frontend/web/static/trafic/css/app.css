@@ -1819,39 +1819,24 @@ body.sheet-covers .fonds {
   margin: 10px 0 4px;
   padding: 0 2px;
 }
-.push-invite .silence-row {
+.push-invite .switch {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 16px;
   border-bottom: 1px solid var(--line);
   padding: 10px 14px;
   box-shadow: var(--shadow);
+  min-height: 64px;
 }
-.push-invite .silence-row:disabled {
-  opacity: 0.72;
-  cursor: not-allowed;
-}
-.push-invite .silence-row strong {
+.push-invite .switch strong {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.push-invite.is-ok {
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: var(--soft);
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 600;
+.push-invite .switch input:disabled + .switch-ui {
+  opacity: 0.45;
 }
-.push-invite.is-ok small {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-}
-.push-invite.is-ok span {
+.reglages-carte .switch strong {
   display: inline-flex;
   align-items: center;
   gap: 8px;

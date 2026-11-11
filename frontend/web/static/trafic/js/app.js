@@ -111,7 +111,7 @@ const FAQ = [
   {
     id: "premium",
     q: "Que comprend Premium, et est-ce payant ?",
-    a: "Listes de quartiers, trajet, alertes à l'approche, GPS, heures de vigilance, mode conduite et silence de deux heures. Les notifications téléphone sur nouveau signalement sont gratuites pour tout le monde (bouton Autoriser sur la carte). Sur cette version, activer Premium enregistre le droit sans débit : le paiement mobile money n'est pas branché.",
+    a: "Listes de quartiers, trajet, alertes à l'approche, GPS, heures de vigilance, mode conduite et silence de deux heures. Les alertes téléphone sur la route sont gratuites pour tout le monde (interrupteur sur la carte). Sur cette version, activer Premium enregistre le droit sans débit : le paiement mobile money n'est pas branché.",
   },
   {
     id: "install",
@@ -1152,40 +1152,58 @@ function boutonSignaler() {
   return `<button type="button" class="btn btn-primary btn-compact btn-signaler" data-action="compose">${uiIcon("alarm")} Signaler</button>`;
 }
 
+function pushActifSouhaite() {
+  try {
+    const v = localStorage.getItem("wayize.push.actif");
+    if (v === "0") return false;
+    if (v === "1") return true;
+  } catch (error) {
+    // localStorage peut être indisponible.
+  }
+  return false;
+}
+
+function memoriserPushActif(actif) {
+  try {
+    localStorage.setItem("wayize.push.actif", actif ? "1" : "0");
+  } catch (error) {
+    // ignore
+  }
+  if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
+  boot.reglages.push_actif = !!actif;
+}
+
+function aidePushCourte() {
+  if (estIOSInstall() && !dejaInstallee()) {
+    return "Sur iPhone : ajoutez Wayizé à l’écran d’accueil, puis activez.";
+  }
+  return "Recevez une alerte quand quelque chose se passe sur la route.";
+}
+
 function invitePushHtml(options) {
-  const compact = options && options.compact;
+  const dansReglages = options && options.reglages;
   if (!("Notification" in window)) return "";
   const notif = etatNotifications();
   const pushServeur = reglagesCarte().push === true || Boolean(reglagesCarte().vapid_public);
   if (notif === "unsupported") return "";
-  if (notif === "granted" && pushServeur) {
-    if (compact) return "";
-    return `
-      <div class="push-invite is-ok" role="status">
-        <span>${uiIcon("bell", 18)} Notifications téléphone actives</span>
-        <small>Sans compte. Alerte système quand un signalement sort, même si Wayizé est fermée.</small>
-      </div>`;
-  }
   const bloque = notif === "denied";
+  const actif = !bloque && pushServeur && pushActifSouhaite() && notif === "granted";
   const libelle = bloque
     ? "Notifications bloquées"
-    : pushServeur
-      ? "Autoriser les notifications"
-      : "Notifications téléphone";
+    : "Alertes sur la route";
   const aide = bloque
     ? "Débloquez Wayizé dans les paramètres du navigateur."
     : pushServeur
-      ? (estIOSInstall() && !dejaInstallee()
-        ? "Sur iPhone : ajoutez Wayizé à l’écran d’accueil, puis Autoriser."
-        : "Sans compte. Une alerte système à chaque nouveau signalement.")
-      : "Le serveur n’a pas encore les clés VAPID.";
-  return `
-    <div class="push-invite">
-      <button type="button" class="silence-row" data-action="notifications" ${bloque || !pushServeur ? "disabled" : ""}>
-        <span><strong>${uiIcon("bell", 16)} ${esc(libelle)}</strong><small>${esc(aide)}</small></span>
-        <em>${bloque ? "Réglages" : "Autoriser"}</em>
-      </button>
-    </div>`;
+      ? aidePushCourte()
+      : "Le serveur n’a pas encore les clés pour les alertes téléphone.";
+  const corps = `
+    <label class="switch"${bloque || !pushServeur ? ' aria-disabled="true"' : ""}>
+      <span class="switch-copy"><strong>${uiIcon("bell", 16)} ${esc(libelle)}</strong><small>${esc(aide)}</small></span>
+      <input type="checkbox" data-reglage="pushTel" ${actif ? "checked" : ""} ${bloque || !pushServeur ? "disabled" : ""}>
+      <span class="switch-ui" aria-hidden="true"></span>
+    </label>`;
+  if (dansReglages) return corps;
+  return `<div class="push-invite">${corps}</div>`;
 }
 
 function renderFeed() {
@@ -1650,6 +1668,7 @@ async function abonnerPush(options) {
       body: JSON.stringify(json),
     });
     try { localStorage.setItem("wayize.vapid.public", cle); } catch (error) { /* ignore */ }
+    memoriserPushActif(true);
     if (enregistre && typeof enregistre.abonnements === "number") {
       if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
       boot.reglages.push = true;
@@ -1664,6 +1683,44 @@ async function abonnerPush(options) {
   }
 }
 
+async function desabonnerPush(options) {
+  const silencieux = options && options.silencieux;
+  let endpoint = "";
+  try {
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        endpoint = (sub.toJSON() && sub.toJSON().endpoint) || sub.endpoint || "";
+        await sub.unsubscribe();
+      }
+    }
+  } catch (error) {
+    // On coupe côté serveur même si le navigateur refuse unsubscribe.
+  }
+  try {
+    const corps = { actif: false };
+    if (endpoint) corps.endpoint = endpoint;
+    const data = await api("/api/notifications/abonnement/", {
+      method: "POST",
+      body: JSON.stringify(corps),
+    });
+    if (data && typeof data.abonnements === "number") {
+      if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
+      boot.reglages.abonnements = data.abonnements;
+    }
+  } catch (error) {
+    if (!silencieux) {
+      toast(messageFrom(error, "La coupure des notifications a échoué."));
+    }
+    memoriserPushActif(false);
+    return { ok: false, raison: "erreur" };
+  }
+  memoriserPushActif(false);
+  if (!silencieux) toast("Alertes téléphone coupées.");
+  return { ok: true };
+}
+
 async function demanderNotifications(options) {
   const silencieux = options && options.silencieux;
   if (!("Notification" in window)) {
@@ -1672,21 +1729,24 @@ async function demanderNotifications(options) {
   }
   if (Notification.permission === "granted") {
     const abo = await abonnerPush({ silencieux });
-    if (!silencieux && abo.ok) toast("Notifications téléphone actives.");
+    if (!silencieux && abo.ok) toast("Alertes sur la route activées.");
     return "granted";
   }
   if (Notification.permission === "denied") {
     if (!silencieux) toast("Les notifications sont bloquées dans le navigateur.");
+    memoriserPushActif(false);
     return "denied";
   }
   const resultat = await Notification.requestPermission();
   if (resultat === "granted") {
     const abo = await abonnerPush({ silencieux });
     if (!silencieux) {
-      toast(abo.ok ? "Notifications téléphone activées." : "Permission OK, mais l'abonnement Push a échoué.");
+      toast(abo.ok ? "Alertes sur la route activées." : "Permission OK, mais l'abonnement a échoué.");
     }
-  } else if (!silencieux) {
-    toast("Notifications refusées.");
+    if (!abo.ok) memoriserPushActif(false);
+  } else {
+    memoriserPushActif(false);
+    if (!silencieux) toast("Notifications refusées.");
   }
   return resultat;
 }
@@ -2036,33 +2096,13 @@ function panneauVeille(listesHtml) {
 
 function panneauAlertes(reglages) {
   const silence = reglages.silenceJusqua && Date.now() < reglages.silenceJusqua;
-  const notif = etatNotifications();
-  const pushServeur = reglagesCarte().push === true || Boolean(reglagesCarte().vapid_public);
-  const notifLibelle = notif === "granted"
-    ? (pushServeur ? "Notifications téléphone actives" : "Permission OK — Push serveur absent")
-    : notif === "denied"
-      ? "Notifications bloquées par le navigateur"
-      : notif === "unsupported"
-        ? "Notifications non disponibles ici"
-        : "Autoriser les notifications téléphone";
-  const aboCompte = Number(reglagesCarte().abonnements || 0);
-  const notifAide = notif === "granted"
-    ? (pushServeur
-      ? (aboCompte > 0
-        ? `Alerte système même si Wayizé est fermée (${aboCompte} téléphone${aboCompte > 1 ? "s" : ""} abonné${aboCompte > 1 ? "s" : ""}).`
-        : "Alerte système même si Wayizé est fermée (Web Push). Touchez Autoriser pour enregistrer ce téléphone.")
-      : "Le serveur n'a pas les clés VAPID : seules les alertes à l'écran marchent.")
-    : "Pas un compteur dans l’app : une alerte native du téléphone. Sur iPhone, Wayizé doit être sur l’écran d’accueil.";
   return `
     <section class="bloc">
       <h2 class="bloc-titre">Sur la route</h2>
       <div class="reglages-carte">
         ${interrupteur("visuel", reglages.visuel, "Sur l’écran")}
         ${interrupteur("son", reglages.son, "Son")}
-        <button type="button" class="silence-row" data-action="notifications" ${notif === "unsupported" || notif === "denied" ? "disabled" : ""}>
-          <span><strong>${esc(notifLibelle)}</strong><small>${esc(notifAide)}</small></span>
-          <em>${notif === "granted" && pushServeur ? "OK" : "Activer"}</em>
-        </button>
+        ${invitePushHtml({ reglages: true })}
         ${interrupteur("gps", reglages.gps, "Position GPS", "Point sur la carte, alerte à l’approche")}
         ${reglages.gps ? `<p class="gps-etat" id="gps-etat">${esc(state.gpsEtat || "Position en attente.")}</p>` : ""}
         ${interrupteur("conduite", reglages.conduite, "Mode conduite", "Texte plus grand")}
@@ -3215,10 +3255,23 @@ function suivreTrajet(depart, arrivee) {
 
 function changerReglage(nom, valeur) {
   const reglages = assurerReglages();
+  if (nom === "pushTel") {
+    if (valeur) {
+      demanderNotifications().then((statut) => {
+        if (statut !== "granted" || !pushActifSouhaite()) {
+          memoriserPushActif(false);
+        }
+        render();
+      });
+    } else {
+      desabonnerPush().then(() => render());
+    }
+    return;
+  }
   reglages[nom] = valeur;
   memoriserSession();
   document.body.classList.toggle("is-driving", !!(state.compte && state.compte.premium && reglages.conduite));
-  if (nom === "visuel" && valeur) {
+  if (nom === "visuel" && valeur && pushActifSouhaite()) {
     demanderNotifications({ silencieux: true }).then(() => render());
   }
   if (nom === "gps") {
@@ -3774,7 +3827,9 @@ function start() {
   window.setInterval(quietRefresh, 45000);
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").then(() => {
-      if (etatNotifications() === "granted") abonnerPush({ silencieux: true });
+      if (etatNotifications() === "granted" && pushActifSouhaite()) {
+        abonnerPush({ silencieux: true });
+      }
     }).catch(() => {});
   }
   proposerInstall();

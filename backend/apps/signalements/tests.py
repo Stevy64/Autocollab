@@ -349,6 +349,26 @@ class MapSliceTests(TestCase):
         self.assertTrue(abo.json()["ok"])
         self.assertEqual(abo.json()["abonnements"], 1)
 
+        coupe = self.post_json(
+            "/api/notifications/abonnement/",
+            {
+                "actif": False,
+                "endpoint": "https://fcm.googleapis.com/fcm/send/test-endpoint",
+            },
+        )
+        self.assertEqual(coupe.status_code, 200, coupe.content)
+        self.assertFalse(coupe.json()["actif"])
+        self.assertEqual(coupe.json()["retires"], 1)
+        self.assertEqual(coupe.json()["abonnements"], 0)
+        self.assertEqual(AbonnementPush.objects.count(), 0)
+
+        AbonnementPush.objects.create(
+            endpoint="https://fcm.googleapis.com/fcm/send/test-endpoint",
+            cle_p256dh="x" * 40,
+            cle_auth="y" * 20,
+            session_cle=CLE,
+        )
+
         vus = []
 
         def faux_webpush(**kwargs):
