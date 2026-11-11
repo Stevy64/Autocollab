@@ -1180,30 +1180,52 @@ function aidePushCourte() {
   return "Recevez une alerte quand quelque chose se passe sur la route.";
 }
 
+function pushServeurPret() {
+  return reglagesCarte().push === true || Boolean(reglagesCarte().vapid_public);
+}
+
+async function assurerPushEtat() {
+  try {
+    const data = await api("/api/notifications/etat/");
+    if (!data || typeof data !== "object") return false;
+    if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
+    boot.reglages.push = !!data.push;
+    if (typeof data.abonnements === "number") boot.reglages.abonnements = data.abonnements;
+    if (data.vapid_public) boot.reglages.vapid_public = data.vapid_public;
+    return !!data.push;
+  } catch (error) {
+    return pushServeurPret();
+  }
+}
+
 function invitePushHtml(options) {
   const dansReglages = options && options.reglages;
-  if (!("Notification" in window)) return "";
-  const notif = etatNotifications();
-  const pushServeur = reglagesCarte().push === true || Boolean(reglagesCarte().vapid_public);
-  if (notif === "unsupported") return "";
+  const pushServeur = pushServeurPret();
+  // Toujours visible sous « En ce moment » dès que le serveur a le Push (etat push:true),
+  // même si Notification/PushManager manquent encore (on explique pourquoi).
+  if (!pushServeur && !dansReglages) return "";
+  const notifOk = "Notification" in window;
+  const notif = notifOk ? etatNotifications() : "unsupported";
   const bloque = notif === "denied";
-  const actif = !bloque && pushServeur && pushActifSouhaite() && notif === "granted";
-  const libelle = bloque
-    ? "Notifications bloquées"
-    : "Alertes sur la route";
-  const aide = bloque
-    ? "Débloquez Wayizé dans les paramètres du navigateur."
-    : pushServeur
-      ? aidePushCourte()
-      : "Le serveur n’a pas encore les clés pour les alertes téléphone.";
+  const indispo = !notifOk || notif === "unsupported" || !pushDisponibleNavigateur();
+  const actif = pushServeur && !bloque && !indispo && pushActifSouhaite() && notif === "granted";
+  let aide = aidePushCourte();
+  if (!pushServeur) aide = "Le serveur n’a pas encore les clés pour les alertes téléphone.";
+  else if (bloque) aide = "Débloquez Wayizé dans les paramètres du navigateur.";
+  else if (indispo) {
+    aide = estIOSInstall() && !dejaInstallee()
+      ? "Sur iPhone : ajoutez Wayizé à l’écran d’accueil, puis activez."
+      : "Ce navigateur ne peut pas afficher d’alerte téléphone ici.";
+  }
+  const desactive = !pushServeur || bloque || indispo;
   const corps = `
-    <label class="switch"${bloque || !pushServeur ? ' aria-disabled="true"' : ""}>
-      <span class="switch-copy"><strong>${uiIcon("bell", 16)} ${esc(libelle)}</strong><small>${esc(aide)}</small></span>
-      <input type="checkbox" data-reglage="pushTel" ${actif ? "checked" : ""} ${bloque || !pushServeur ? "disabled" : ""}>
+    <label class="switch" id="push-route-switch"${desactive ? ' aria-disabled="true"' : ""}>
+      <span class="switch-copy"><strong>${uiIcon("bell", 16)} Alertes sur la route</strong><small>${esc(aide)}</small></span>
+      <input type="checkbox" data-reglage="pushTel" ${actif ? "checked" : ""} ${desactive ? "disabled" : ""}>
       <span class="switch-ui" aria-hidden="true"></span>
     </label>`;
   if (dansReglages) return corps;
-  return `<div class="push-invite">${corps}</div>`;
+  return `<div class="push-invite" id="push-route" data-push="${pushServeur ? "on" : "off"}">${corps}</div>`;
 }
 
 function renderFeed() {
@@ -1243,8 +1265,13 @@ function renderFeed() {
 
 function renderLoading() {
   return `
-    <div class="sheet-head"><div><h1>En ce moment</h1><p>Lecture des signalements…</p></div></div>
-    <div class="skeleton-list" aria-hidden="true"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>`;
+    <div class="feed">
+    <div class="feed-bar">
+      <div class="sheet-head"><div><h1>En ce moment</h1><p>Lecture des signalements…</p></div></div>
+      ${invitePushHtml()}
+    </div>
+    <div class="skeleton-list" aria-hidden="true"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    </div>`;
 }
 
 function renderError() {
@@ -3816,12 +3843,17 @@ if ("serviceWorker" in navigator) {
 
 function start() {
   boot = JSON.parse(document.getElementById("boot-data").textContent);
+  if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
   restaurerMemoire();
   lireLienCompte();
   initMap();
   bind();
   if (!isDesktop()) setVisible(visiblePx());
   render();
+  // etat push peut manquer dans boot (cadre secours / cache) : on le relit puis on repeint le bandeau.
+  assurerPushEtat().then((pret) => {
+    if (pret) render();
+  });
   reload();
   chargerCompte().then(() => reglerGps());
   window.setInterval(quietRefresh, 45000);

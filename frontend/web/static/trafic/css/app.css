@@ -1816,10 +1816,14 @@ body.sheet-covers .fonds {
   background: var(--soft);
 }
 .push-invite {
-  margin: 10px 0 4px;
-  padding: 0 2px;
+  display: block;
+  position: relative;
+  z-index: 3;
+  margin: 4px 16px 10px;
+  padding: 0;
 }
 .push-invite .switch {
+  display: flex;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 16px;
