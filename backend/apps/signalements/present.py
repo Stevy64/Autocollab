@@ -124,6 +124,7 @@ def signalement_public(signalement, appuye, degage=False, mien=False):
         "appuye": appuye,
         "degages": degages,
         "degage": degage,
+        "mien": bool(mien),
         "commentaires": [commentaire_public(note) for note in notes],
         "cree_le": signalement.cree_le.isoformat(),
         "relatif": relatif(signalement.cree_le),

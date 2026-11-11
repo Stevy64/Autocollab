@@ -116,7 +116,7 @@ const FAQ = [
   {
     id: "install",
     q: "Comment installer Wayizé ?",
-    a: "Le bouton Installer ajoute Wayizé sur le téléphone, pour l'utiliser sans passer par un navigateur. Sur iPhone : Partager, puis Sur l'écran d'accueil. Un lien Android ou Apple n'apparaît que s'il a été publié dans les paramètres.",
+    a: "Quand le navigateur le permet, le bouton Installer ouvre la boîte d'installation (beforeinstallprompt). Sur iPhone : Partager, puis Sur l'écran d'accueil. Si Wayizé est déjà installée, l'écran le dit. Un lien Android ou Apple n'apparaît que s'il a été publié dans les paramètres.",
   },
   {
     id: "retrait",
@@ -313,6 +313,7 @@ const UI = {
   car: '<path d="M4 14.5h16M6.2 14.2 7.6 9.2A1.4 1.4 0 0 1 9 8.2h6a1.4 1.4 0 0 1 1.4 1l1.4 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="8" cy="16.2" r="1.2" fill="currentColor"/><circle cx="16" cy="16.2" r="1.2" fill="currentColor"/>',
   sheetDown: '<path d="M4.5 15.2h15a1.4 1.4 0 0 1 1.4 1.4v2.4a1.4 1.4 0 0 1-1.4 1.4h-15a1.4 1.4 0 0 1-1.4-1.4v-2.4a1.4 1.4 0 0 1 1.4-1.4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 8.2 12 12l3.8-3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
   sheetUp: '<path d="M4.5 15.2h15a1.4 1.4 0 0 1 1.4 1.4v2.4a1.4 1.4 0 0 1-1.4 1.4h-15a1.4 1.4 0 0 1-1.4-1.4v-2.4a1.4 1.4 0 0 1 1.4-1.4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 12 12 8.2 15.8 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+  share: '<circle cx="18" cy="5" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="6" cy="12" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="18" cy="19" r="2.4" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.2 10.8 15.6 6.4M8.2 13.2 15.6 17.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
 };
 
 function uiIcon(name, size = 16) {
@@ -1102,18 +1103,21 @@ function itemHtml(report) {
   const meta = `${report.type_label} · ${report.relatif}${notes ? ` · ${notes} précision${notes > 1 ? "s" : ""}` : ""}`;
   const active = report.id === state.selectedId ? " is-active" : "";
   return `
-    <button type="button" class="item${active}" data-action="open" data-id="${report.id}">
-      <span class="type-dot item-dot" style="background:${style.pin}"></span>
-      <span class="item-body">
-        <span class="item-top">
-          <span class="item-title">${esc(report.lieu)}</span>
-          <span class="item-count">×${report.appuis}</span>
+    <article class="item${active}">
+      <button type="button" class="item-main" data-action="open" data-id="${report.id}">
+        <span class="type-dot item-dot" style="background:${style.pin}"></span>
+        <span class="item-body">
+          <span class="item-top">
+            <span class="item-title">${esc(report.lieu)}</span>
+            <span class="item-count">×${report.appuis}</span>
+          </span>
+          <span class="item-excerpt">${esc(report.commentaire)}</span>
+          <span class="item-meta">${esc(meta)}</span>
+          ${report.degages ? `<span class="item-clear">${uiIcon("clear", 14)} Dégagé ×${report.degages}</span>` : ""}
         </span>
-        <span class="item-excerpt">${esc(report.commentaire)}</span>
-        <span class="item-meta">${esc(meta)}</span>
-        ${report.degages ? `<span class="item-clear">${uiIcon("clear", 14)} Dégagé ×${report.degages}</span>` : ""}
-      </span>
-    </button>`;
+      </button>
+      <button type="button" class="item-share" data-action="share" data-id="${report.id}" aria-label="Partager ce signalement">${uiIcon("share", 18)}</button>
+    </article>`;
 }
 
 function emptyHtml() {
@@ -1240,6 +1244,9 @@ function renderDetail() {
         <button type="button" class="appui degage${report.degage ? " is-on" : ""}" data-action="degage" data-id="${report.id}" aria-pressed="${report.degage ? "true" : "false"}" aria-label="${report.degage ? "Dégagé" : "C'est dégagé"} ×${degages}">
           <span>${uiIcon(report.degage ? "check" : "clear")} ${report.degage ? "Dégagé" : "C'est dégagé"}</span>
           <span class="appui-count">×${degages}</span>
+        </button>
+        <button type="button" class="appui share-action" data-action="share" data-id="${report.id}" aria-label="Partager">
+          <span>${uiIcon("share")} Partager</span>
         </button>
       </div>
       <p class="appui-hint">${esc(hint)}<br><span class="degage-hint">${esc(degageHint)}</span></p>
@@ -1463,16 +1470,134 @@ function bip() {
   osc.onended = () => ctx.close();
 }
 
-function alerter(phrase) {
+function urlSignalement(report) {
+  return `${location.origin}${location.pathname}#s-${report.id}`;
+}
+
+async function partagerSignalement(id) {
+  const report = state.reports.find((item) => item.id === Number(id)) || selected();
+  if (!report || Number(report.id) !== Number(id)) {
+    toast("Ce signalement n'est plus là.");
+    return;
+  }
+  const url = urlSignalement(report);
+  const titre = `Wayizé — ${report.type_label}`;
+  const texte = `${report.type_label} à ${report.lieu} : ${report.commentaire}`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: titre, text: texte, url });
+      return;
+    }
+  } catch (error) {
+    if (error && error.name === "AbortError") return;
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(`${texte}\n${url}`);
+      toast("Lien copié.");
+      return;
+    }
+  } catch (error) {
+    // On bascule sur le champ de secours.
+  }
+  window.prompt("Copiez le lien du signalement :", url);
+}
+
+function urlBase64VersUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const brut = atob(base64);
+  const sortie = new Uint8Array(brut.length);
+  for (let i = 0; i < brut.length; i += 1) sortie[i] = brut.charCodeAt(i);
+  return sortie;
+}
+
+async function notifierOS(phrase, options) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const opts = options || {};
+  const payload = {
+    body: phrase,
+    icon: "/static/trafic/icons/icon-192.png",
+    badge: "/static/trafic/icons/favicon-32.png",
+    tag: opts.tag || "wayize-alerte",
+    renotify: true,
+    data: { url: opts.url || "/" },
+  };
+  try {
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification("Wayizé", payload);
+      return;
+    }
+  } catch (error) {
+    // Retombe sur Notification directe.
+  }
+  try {
+    new Notification("Wayizé", payload);
+  } catch (error) {
+    // Le navigateur refuse parfois hors geste utilisateur.
+  }
+}
+
+async function abonnerPush() {
+  const cle = String(reglagesCarte().vapid_public || "").trim();
+  if (!cle || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64VersUint8Array(cle),
+      });
+    }
+    await api("/api/notifications/abonnement/", {
+      method: "POST",
+      body: JSON.stringify(sub.toJSON()),
+    });
+  } catch (error) {
+    // Sans VAPID ou sans Push, les alertes locales via le service worker restent actives.
+  }
+}
+
+async function demanderNotifications(options) {
+  const silencieux = options && options.silencieux;
+  if (!("Notification" in window)) {
+    if (!silencieux) toast("Ce navigateur ne propose pas les notifications.");
+    return "unsupported";
+  }
+  if (Notification.permission === "granted") {
+    await abonnerPush();
+    return "granted";
+  }
+  if (Notification.permission === "denied") {
+    if (!silencieux) toast("Les notifications sont bloquées dans le navigateur.");
+    return "denied";
+  }
+  const resultat = await Notification.requestPermission();
+  if (resultat === "granted") {
+    await abonnerPush();
+    if (!silencieux) toast("Notifications téléphone activées.");
+  } else if (!silencieux) {
+    toast("Notifications refusées.");
+  }
+  return resultat;
+}
+
+function etatNotifications() {
+  if (!("Notification" in window)) return "unsupported";
+  return Notification.permission;
+}
+
+function alerter(phrase, options) {
   const reglages = assurerReglages();
   if (!dansLesHeures()) return;
   state.veille = phrase;
   peindreVeille();
   if (reglages.visuel !== false) {
     toast(phrase);
-    if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
-      new Notification("Wayizé", { body: phrase, silent: true });
-    }
+    notifierOS(phrase, options);
   }
   if (reglages.son) bip();
 }
@@ -1803,12 +1928,27 @@ function panneauVeille(listesHtml) {
 
 function panneauAlertes(reglages) {
   const silence = reglages.silenceJusqua && Date.now() < reglages.silenceJusqua;
+  const notif = etatNotifications();
+  const notifLibelle = notif === "granted"
+    ? "Notifications téléphone actives"
+    : notif === "denied"
+      ? "Notifications bloquées par le navigateur"
+      : notif === "unsupported"
+        ? "Notifications non disponibles ici"
+        : "Autoriser les notifications téléphone";
+  const notifAide = notif === "granted"
+    ? "Les nouveaux signalements passent par le système (barre des tâches / centre de notifications)."
+    : "Pas un compteur dans l’app : une alerte native du téléphone.";
   return `
     <section class="bloc">
       <h2 class="bloc-titre">Sur la route</h2>
       <div class="reglages-carte">
         ${interrupteur("visuel", reglages.visuel, "Sur l’écran")}
         ${interrupteur("son", reglages.son, "Son")}
+        <button type="button" class="silence-row" data-action="notifications" ${notif === "unsupported" || notif === "denied" ? "disabled" : ""}>
+          <span><strong>${esc(notifLibelle)}</strong><small>${esc(notifAide)}</small></span>
+          <em>${notif === "granted" ? "OK" : "Activer"}</em>
+        </button>
         ${interrupteur("gps", reglages.gps, "Position GPS", "Point sur la carte, alerte à l’approche")}
         ${reglages.gps ? `<p class="gps-etat" id="gps-etat">${esc(state.gpsEtat || "Position en attente.")}</p>` : ""}
         ${interrupteur("conduite", reglages.conduite, "Mode conduite", "Texte plus grand")}
@@ -2455,15 +2595,24 @@ async function reload() {
 }
 
 function surveiller(precedents, suivants) {
-  if (!state.compte || !state.compte.premium) return;
-  if (!state.listeId && !state.trajet) return;
   const connus = new Set(precedents.map((report) => report.id));
-  const frais = suivants.filter((report) => !connus.has(report.id) && correspondVeille(report));
+  const frais = suivants.filter((report) => !connus.has(report.id));
   if (!frais.length) return;
-  const phrase = frais.length === 1
-    ? `${frais[0].type_label} vers ${frais[0].lieu}`
-    : `${frais.length} nouveaux signalements sur votre veille`;
-  alerter(phrase);
+  let cibles = [];
+  const veillePremium = state.compte && state.compte.premium && (state.listeId || state.trajet);
+  if (veillePremium) {
+    cibles = frais.filter(correspondVeille);
+  } else if ("Notification" in window && Notification.permission === "granted") {
+    cibles = frais.filter(typeSurveille);
+  }
+  if (!cibles.length) return;
+  const phrase = cibles.length === 1
+    ? `${cibles[0].type_label} vers ${cibles[0].lieu}`
+    : veillePremium
+      ? `${cibles.length} nouveaux signalements sur votre veille`
+      : `${cibles.length} nouveaux signalements à Libreville`;
+  const url = cibles.length === 1 ? urlSignalement(cibles[0]) : "/";
+  alerter(phrase, { url, tag: cibles.length === 1 ? `wayize-${cibles[0].id}` : "wayize-alerte" });
 }
 
 async function quietRefresh() {
@@ -2855,9 +3004,7 @@ async function activerPremium() {
     state.compteEnCours = false;
     appliquerCompte(data.compte);
     toast("Premium est actif. Rien n'a été débité.");
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
-    }
+    await demanderNotifications({ silencieux: true });
     render();
   } catch (error) {
     state.compteEnCours = false;
@@ -2956,8 +3103,8 @@ function changerReglage(nom, valeur) {
   reglages[nom] = valeur;
   memoriserSession();
   document.body.classList.toggle("is-driving", !!(state.compte && state.compte.premium && reglages.conduite));
-  if (nom === "visuel" && valeur && "Notification" in window && Notification.permission === "default") {
-    Notification.requestPermission().catch(() => {});
+  if (nom === "visuel" && valeur) {
+    demanderNotifications({ silencieux: true }).then(() => render());
   }
   if (nom === "gps") {
     if (valeur && navigator.geolocation) {
@@ -3006,6 +3153,11 @@ function onSheetClick(event) {
   }
   if (action === "filter") setFilter(el.dataset.filter);
   else if (action === "open") selectReport(Number(el.dataset.id));
+  else if (action === "share") {
+    event.preventDefault();
+    partagerSignalement(Number(el.dataset.id));
+  }
+  else if (action === "notifications") demanderNotifications().then(() => render());
   else if (action === "back") goBack();
   else if (action === "compose") showCompose();
   else if (action === "auth-mode") {
@@ -3384,50 +3536,111 @@ function dejaInstallee() {
   return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 }
 
+function estIOSInstall() {
+  const ua = navigator.userAgent || "";
+  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function retirerBandeauInstall() {
+  const bandeau = document.getElementById("install-banner");
+  if (bandeau) bandeau.remove();
+}
+
+function afficherInstallee() {
+  let vu = "";
+  try { vu = localStorage.getItem("wayize.install.vu") || ""; } catch (error) { vu = ""; }
+  if (vu === "1" || document.getElementById("install-banner")) return;
+  const bandeau = document.createElement("aside");
+  bandeau.id = "install-banner";
+  bandeau.className = "install-banner is-done";
+  bandeau.innerHTML = `<strong>Wayizé est installée</strong><p>L'application est déjà sur cet appareil.</p><div class="install-actions"><button type="button" class="is-quiet" data-fermer>OK</button></div>`;
+  document.body.appendChild(bandeau);
+  bandeau.querySelector("[data-fermer]").addEventListener("click", () => {
+    try { localStorage.setItem("wayize.install.vu", "1"); } catch (error) { /* ignore */ }
+    bandeau.remove();
+  });
+}
+
+async function lancerInstall(bouton) {
+  if (!inviteInstall) return;
+  const evenement = inviteInstall;
+  if (bouton) bouton.classList.add("is-busy");
+  try {
+    await evenement.prompt();
+    const choix = await evenement.userChoice;
+    inviteInstall = null;
+    if (choix && choix.outcome === "accepted") {
+      retirerBandeauInstall();
+      return;
+    }
+  } catch (error) {
+    // Le navigateur peut refuser un second prompt.
+  }
+  if (bouton) bouton.classList.remove("is-busy");
+}
+
 function proposerInstall() {
-  if (dejaInstallee() || document.getElementById("install-banner")) return;
+  if (document.getElementById("install-banner")) return;
+  if (dejaInstallee()) {
+    afficherInstallee();
+    return;
+  }
   let reporte = 0;
   try { reporte = Number(localStorage.getItem("wayize.install.reporte") || 0); } catch (error) { reporte = 0; }
   if (reporte && Date.now() - reporte < 3 * 24 * 60 * 60 * 1000) return;
+
   const android = lienApp("lien_android");
   const apple = lienApp("lien_apple");
-  const precision = "Pour l'utiliser dans votre téléphone sans passer par un navigateur.";
+  const peutInstaller = Boolean(inviteInstall);
+  const ios = estIOSInstall();
+  if (!peutInstaller && !ios && !android && !apple) return;
+
   const natif = [
     android ? `<a href="${esc(android)}" target="_blank" rel="noopener noreferrer">Android</a>` : "",
     apple ? `<a href="${esc(apple)}" target="_blank" rel="noopener noreferrer">Apple</a>` : "",
   ].join("");
+
+  let titre = "Installer Wayizé";
+  let precision = "Pour l'utiliser dans votre téléphone sans passer par un navigateur.";
+  let actions = "";
+  if (peutInstaller) {
+    actions = `<button type="button" data-install>Installer</button>${natif}<button type="button" class="is-quiet" data-plus-tard>Plus tard</button>`;
+  } else if (ios) {
+    precision = "Sur iPhone : Partager, puis Sur l'écran d'accueil.";
+    actions = `${natif}<button type="button" class="is-quiet" data-plus-tard>Plus tard</button>`;
+  } else {
+    titre = "Wayizé sur le téléphone";
+    precision = "Ouvrez le lien de la boutique, ou utilisez le menu du navigateur pour installer l'application.";
+    actions = `${natif}<button type="button" class="is-quiet" data-plus-tard>Plus tard</button>`;
+  }
+
   const bandeau = document.createElement("aside");
   bandeau.id = "install-banner";
   bandeau.className = "install-banner";
-  bandeau.innerHTML = `<strong>Installer Wayizé</strong><p>${precision}</p><div class="install-actions"><button type="button" data-install>Installer</button>${natif}<button type="button" class="is-quiet" data-plus-tard>Plus tard</button></div>`;
+  bandeau.innerHTML = `<strong>${titre}</strong><p>${precision}</p><div class="install-actions">${actions}</div>`;
   document.body.appendChild(bandeau);
   const bouton = bandeau.querySelector("[data-install]");
-  bouton.addEventListener("click", () => {
-    if (!inviteInstall) return;
-    const evenement = inviteInstall;
-    bouton.classList.add("is-busy");
-    evenement.prompt().then(() => evenement.userChoice).then((choix) => {
-      inviteInstall = null;
-      if (choix && choix.outcome === "accepted") bandeau.remove();
-      else bouton.classList.remove("is-busy");
-    }).catch(() => {
-      bouton.classList.remove("is-busy");
+  if (bouton) bouton.addEventListener("click", () => lancerInstall(bouton));
+  const plusTard = bandeau.querySelector("[data-plus-tard]");
+  if (plusTard) {
+    plusTard.addEventListener("click", () => {
+      try { localStorage.setItem("wayize.install.reporte", String(Date.now())); } catch (error) { /* ignore */ }
+      bandeau.remove();
     });
-  });
-  bandeau.querySelector("[data-plus-tard]").addEventListener("click", () => {
-    try { localStorage.setItem("wayize.install.reporte", String(Date.now())); } catch (error) { /* le bandeau revient à la prochaine visite */ }
-    bandeau.remove();
-  });
+  }
 }
 
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   inviteInstall = event;
-  if (!document.getElementById("install-banner") && boot) proposerInstall();
+  retirerBandeauInstall();
+  if (boot) proposerInstall();
 });
 window.addEventListener("appinstalled", () => {
-  const bandeau = document.getElementById("install-banner");
-  if (bandeau) bandeau.remove();
+  inviteInstall = null;
+  retirerBandeauInstall();
+  try { localStorage.setItem("wayize.install.vu", "1"); } catch (error) { /* ignore */ }
+  afficherInstallee();
 });
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -3445,7 +3658,9 @@ function start() {
   chargerCompte().then(() => reglerGps());
   window.setInterval(quietRefresh, 45000);
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").then(() => {
+      if (etatNotifications() === "granted") abonnerPush();
+    }).catch(() => {});
   }
   proposerInstall();
 }

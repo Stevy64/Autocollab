@@ -118,8 +118,11 @@ def _logo_url(reglage):
 
 def publics():
     """Ce que la carte peut afficher, sans les plafonds internes."""
+    import os
+
     lu = lire()
-    return {
+    vapid = os.environ.get("WAYIZE_VAPID_PUBLIC_KEY", "").strip()
+    corps = {
         "prix_premium": lu["prix_premium"],
         "fond_defaut": lu["fond_defaut"],
         "routes_actives": lu["routes_actives"],
@@ -127,3 +130,6 @@ def publics():
         "lien_apple": lu["lien_apple"],
         "logo": lu["logo"],
     }
+    if vapid:
+        corps["vapid_public"] = vapid
+    return corps

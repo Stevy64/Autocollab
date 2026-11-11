@@ -687,22 +687,53 @@ body.sheet-dragging .grabber-arrow { animation-play-state: paused; }
 .item {
   width: 100%;
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  gap: 4px;
+  align-items: stretch;
   min-height: 0;
   content-visibility: auto;
   contain-intrinsic-size: auto 88px;
-  padding: 14px 16px;
+  padding: 6px 6px 6px 14px;
   border: 1px solid #e7e4de;
   border-radius: 18px;
   background: #fff;
   box-shadow: 0 1px 2px rgba(23, 23, 23, 0.04);
   text-align: left;
   color: inherit;
-  cursor: pointer;
 }
 .item.is-active { box-shadow: 0 0 0 2px var(--ink), 0 10px 24px rgba(28, 28, 30, 0.08); }
 .item:hover { background: #fff; }
+.item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 8px 4px 8px 2px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.item-share {
+  flex: none;
+  align-self: center;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.item-share:hover,
+.item-share:focus-visible {
+  background: var(--soft);
+  color: var(--ink);
+}
 .item-body {
   display: flex;
   flex-direction: column;
@@ -1928,7 +1959,12 @@ body.is-driving .veille p { font-size: 18px; }
 }
 .install-banner strong { font-size: 15px; letter-spacing: -0.02em; }
 .install-banner p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.install-banner.is-done {
+  border-color: #c9d7c4;
+  background: rgba(246, 250, 245, 0.97);
+}
 .install-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.appui.share-action { justify-content: center; }
 .install-actions a,
 .install-actions button {
   min-height: 36px;

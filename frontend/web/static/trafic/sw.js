@@ -1,4 +1,4 @@
-const CACHE = "wayize-shell-v2";
+const CACHE = "wayize-shell-v3";
 const TILES = "wayize-tiles-v3";
 const TILE_LIMIT = 120;
 const SHELL = [
@@ -130,5 +130,52 @@ self.addEventListener("fetch", (event) => {
   }
   event.respondWith(
     networkFirst(request, CACHE).catch(() => caches.match(request))
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (error) {
+    try {
+      data = { body: event.data ? event.data.text() : "" };
+    } catch (inner) {
+      data = {};
+    }
+  }
+  const title = data.title || "Wayizé";
+  const options = {
+    body: data.body || "Nouveau signalement à Libreville",
+    icon: "/static/trafic/icons/icon-192.png",
+    badge: "/static/trafic/icons/favicon-32.png",
+    tag: data.tag || "wayize-push",
+    renotify: true,
+    data: { url: data.url || "/" },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const cible = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    (async () => {
+      const clientsList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clientsList) {
+        if ("focus" in client) {
+          await client.focus();
+          if ("navigate" in client) {
+            try {
+              await client.navigate(cible);
+            } catch (error) {
+              // Certains navigateurs refusent navigate() ; l'onglet est déjà au premier plan.
+            }
+          }
+          return;
+        }
+      }
+      if (self.clients.openWindow) await self.clients.openWindow(cible);
+    })()
   );
 });

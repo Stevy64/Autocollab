@@ -1,12 +1,14 @@
 from django.urls import include, path
 
 from apps.pilotage.views import logo
+from apps.signalements.notif_views import abonnement as push_abonnement
 
 from . import views
 
 urlpatterns = [
     path("api/sante/", views.sante, name="sante"),
     path("api/logo/", logo, name="logo"),
+    path("api/notifications/abonnement/", push_abonnement, name="push-abonnement"),
     path("api/signalements/", include("apps.signalements.urls")),
     path("api/signalements/", include("apps.appuis.urls")),
     path("api/signalements/", include("apps.commentaires.urls")),
