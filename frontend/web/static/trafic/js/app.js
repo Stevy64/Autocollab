@@ -1539,13 +1539,59 @@ async function notifierOS(phrase, options) {
   }
 }
 
-async function abonnerPush() {
-  const cle = String(reglagesCarte().vapid_public || "").trim();
-  if (!cle || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
-  if (!("Notification" in window) || Notification.permission !== "granted") return;
+async function lireVapidPublic() {
+  let cle = String(reglagesCarte().vapid_public || "").trim();
+  if (cle) return cle;
+  try {
+    const data = await api("/api/notifications/etat/");
+    if (data && data.vapid_public) {
+      if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
+      boot.reglages.vapid_public = data.vapid_public;
+      boot.reglages.push = !!data.push;
+      return String(data.vapid_public).trim();
+    }
+  } catch (error) {
+    // L'API peut être temporairement indisponible.
+  }
+  return "";
+}
+
+function pushDisponibleNavigateur() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+  // iOS : Push seulement dans la PWA ajoutée à l'écran d'accueil (iOS 16.4+).
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent || "")
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (ios && !dejaInstallee()) return false;
+  return true;
+}
+
+async function abonnerPush(options) {
+  const silencieux = options && options.silencieux;
+  if (!("Notification" in window) || Notification.permission !== "granted") {
+    return { ok: false, raison: "permission" };
+  }
+  if (!pushDisponibleNavigateur()) {
+    if (!silencieux) {
+      toast("Sur iPhone, ajoutez Wayizé à l'écran d'accueil, puis réessayez.");
+    }
+    return { ok: false, raison: "navigateur" };
+  }
+  const cle = await lireVapidPublic();
+  if (!cle) {
+    if (!silencieux) {
+      toast("Le serveur n'a pas encore les clés VAPID. Les alertes téléphone resteront inactives.");
+    }
+    return { ok: false, raison: "vapid" };
+  }
   try {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
+    let cleConnue = "";
+    try { cleConnue = localStorage.getItem("wayize.vapid.public") || ""; } catch (error) { cleConnue = ""; }
+    if (sub && cleConnue && cleConnue !== cle) {
+      await sub.unsubscribe();
+      sub = null;
+    }
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
@@ -1556,8 +1602,13 @@ async function abonnerPush() {
       method: "POST",
       body: JSON.stringify(sub.toJSON()),
     });
+    try { localStorage.setItem("wayize.vapid.public", cle); } catch (error) { /* ignore */ }
+    return { ok: true };
   } catch (error) {
-    // Sans VAPID ou sans Push, les alertes locales via le service worker restent actives.
+    if (!silencieux) {
+      toast(messageFrom(error, "L'abonnement aux notifications a échoué."));
+    }
+    return { ok: false, raison: "erreur" };
   }
 }
 
@@ -1568,7 +1619,8 @@ async function demanderNotifications(options) {
     return "unsupported";
   }
   if (Notification.permission === "granted") {
-    await abonnerPush();
+    const abo = await abonnerPush({ silencieux });
+    if (!silencieux && abo.ok) toast("Notifications téléphone actives.");
     return "granted";
   }
   if (Notification.permission === "denied") {
@@ -1577,8 +1629,10 @@ async function demanderNotifications(options) {
   }
   const resultat = await Notification.requestPermission();
   if (resultat === "granted") {
-    await abonnerPush();
-    if (!silencieux) toast("Notifications téléphone activées.");
+    const abo = await abonnerPush({ silencieux });
+    if (!silencieux) {
+      toast(abo.ok ? "Notifications téléphone activées." : "Permission OK, mais l'abonnement Push a échoué.");
+    }
   } else if (!silencieux) {
     toast("Notifications refusées.");
   }
@@ -1929,16 +1983,19 @@ function panneauVeille(listesHtml) {
 function panneauAlertes(reglages) {
   const silence = reglages.silenceJusqua && Date.now() < reglages.silenceJusqua;
   const notif = etatNotifications();
+  const pushServeur = reglagesCarte().push === true || Boolean(reglagesCarte().vapid_public);
   const notifLibelle = notif === "granted"
-    ? "Notifications téléphone actives"
+    ? (pushServeur ? "Notifications téléphone actives" : "Permission OK — Push serveur absent")
     : notif === "denied"
       ? "Notifications bloquées par le navigateur"
       : notif === "unsupported"
         ? "Notifications non disponibles ici"
         : "Autoriser les notifications téléphone";
   const notifAide = notif === "granted"
-    ? "Les nouveaux signalements passent par le système (barre des tâches / centre de notifications)."
-    : "Pas un compteur dans l’app : une alerte native du téléphone.";
+    ? (pushServeur
+      ? "Alerte système même si Wayizé est fermée (Web Push)."
+      : "Le serveur n'a pas les clés VAPID : seules les alertes à l'écran marchent.")
+    : "Pas un compteur dans l’app : une alerte native du téléphone. Sur iPhone, Wayizé doit être sur l’écran d’accueil.";
   return `
     <section class="bloc">
       <h2 class="bloc-titre">Sur la route</h2>
@@ -1947,7 +2004,7 @@ function panneauAlertes(reglages) {
         ${interrupteur("son", reglages.son, "Son")}
         <button type="button" class="silence-row" data-action="notifications" ${notif === "unsupported" || notif === "denied" ? "disabled" : ""}>
           <span><strong>${esc(notifLibelle)}</strong><small>${esc(notifAide)}</small></span>
-          <em>${notif === "granted" ? "OK" : "Activer"}</em>
+          <em>${notif === "granted" && pushServeur ? "OK" : "Activer"}</em>
         </button>
         ${interrupteur("gps", reglages.gps, "Position GPS", "Point sur la carte, alerte à l’approche")}
         ${reglages.gps ? `<p class="gps-etat" id="gps-etat">${esc(state.gpsEtat || "Position en attente.")}</p>` : ""}
@@ -3659,7 +3716,7 @@ function start() {
   window.setInterval(quietRefresh, 45000);
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").then(() => {
-      if (etatNotifications() === "granted") abonnerPush();
+      if (etatNotifications() === "granted") abonnerPush({ silencieux: true });
     }).catch(() => {});
   }
   proposerInstall();

@@ -54,9 +54,15 @@ DJANGO_SETTINGS_MODULE=wayize_api.prod
 DJANGO_SECRET_KEY=une-autre-valeur-ou-la-meme
 WAYIZE_API_HOSTS=127.0.0.1,localhost
 WAYIZE_SEED=0
+# Web Push (alertes téléphone hors onglet) — générer avec npx web-push generate-vapid-keys
+# WAYIZE_VAPID_PUBLIC_KEY=
+# WAYIZE_VAPID_PRIVATE_KEY=
+# WAYIZE_VAPID_SUBJECT=mailto:contact@wayize.gabomazone.com
 ```
 
 `WAYIZE_SEED=0` empêche la première migration d’insérer les signalements d’exemple (Mont-Bouët, PK5, l’aéroport…). Sans cette variable, ils sont créés.
+
+Sans `WAYIZE_VAPID_PUBLIC_KEY` et `WAYIZE_VAPID_PRIVATE_KEY`, le site peut encore afficher une permission de notification, mais **aucun Push n’est envoyé** quand l’app est fermée. Sur un cluster, la procédure complète (Secret, rollout, téléphone) est la section **10.7** de [premier-cluster.md](premier-cluster.md).
 
 `DATABASE_URL` reste absent tant qu’un seul processus API écrit dans SQLite. Le fichier est `backend/db.sqlite3`, ou le chemin `WAYIZE_SQLITE_PATH`. PostgreSQL est le magasin dès qu’il y a un deuxième processus API, un deuxième pod, ou une sauvegarde qui n’est pas une copie de fichier :
 
@@ -185,6 +191,20 @@ sudo tail -f /var/log/nginx/error.log
 ```
 
 Chaque ligne applicative est du JSON, logger `wayize`, sur la sortie d’erreur. Les champs utiles sont `service` (`web` ou `api`), `event`, `request_id`, `path`, `status`, `ms`. L’en-tête de réponse `X-Request-Id` est le même des deux côtés. Les noms de champs qui contiennent un secret, un mot de passe, un cookie, un jeton ou un e-mail sont retirés. Le tableau des événements est dans le README.
+
+## Notifications téléphone (instance systemd)
+
+Même besoin que sur le cluster : clés VAPID dans `/etc/wayize/api.env`, puis redémarrage de l’API. Ne pas inventer l’IP du VPS ni coller la clé privée dans git.
+
+```bash
+npx --yes web-push generate-vapid-keys
+sudoedit /etc/wayize/api.env   # WAYIZE_VAPID_PUBLIC_KEY, WAYIZE_VAPID_PRIVATE_KEY, WAYIZE_VAPID_SUBJECT
+sudo -u wayize bash -lc 'set -a; source /etc/wayize/api.env; set +a; cd /srv/wayize/backend && /srv/wayize/.venv/bin/python manage.py migrate'
+sudo systemctl restart wayize-api
+curl -fsS https://wayize.gabomazone.com/api/notifications/etat/
+```
+
+`"push": true` confirme la config. Sur le téléphone : installer la PWA (écran d’accueil sur iOS), Compte → Alertes → Autoriser. Détail cluster : [premier-cluster.md](premier-cluster.md) §10.7.
 
 ## Mettre à jour
 

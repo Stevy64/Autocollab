@@ -33,7 +33,7 @@ def enregistrer(endpoint, p256dh, auth, session_cle=""):
     auth = (auth or "").strip()
     if not endpoint.startswith("https://") or not p256dh or not auth:
         return None, "Abonnement push incomplet."
-    if len(endpoint) > 512 or len(p256dh) > 200 or len(auth) > 120:
+    if len(endpoint) > 2048 or len(p256dh) > 200 or len(auth) > 120:
         return None, "Abonnement push trop long."
     abo, _cree = AbonnementPush.objects.update_or_create(
         endpoint=endpoint,
@@ -70,19 +70,25 @@ def notifier_signalement(signalement):
         ensure_ascii=False,
     )
     claims = {"sub": vapid_subject()}
+    privee = vapid_private()
+    publique = vapid_public()
     envoyes = 0
     for abo in AbonnementPush.objects.all().iterator():
         try:
-            webpush(
-                subscription_info={
+            # pywebpush accepte la clé URL-safe ; on passe aussi la publique si dispo.
+            kwargs = {
+                "subscription_info": {
                     "endpoint": abo.endpoint,
                     "keys": {"p256dh": abo.cle_p256dh, "auth": abo.cle_auth},
                 },
-                data=payload,
-                vapid_private_key=vapid_private(),
-                vapid_claims=claims,
-                ttl=120,
-            )
+                "data": payload,
+                "vapid_private_key": privee,
+                "vapid_claims": claims,
+                "ttl": 120,
+            }
+            if publique:
+                kwargs["vapid_public_key"] = publique
+            webpush(**kwargs)
             envoyes += 1
         except WebPushException as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)

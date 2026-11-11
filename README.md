@@ -105,7 +105,9 @@ Get-Content deploy\vapid.local.env | ForEach-Object {
 }
 ```
 
-Puis relancer l’API. Sans ces variables, l’installation PWA, le partage et les notifications locales (onglet ouvert / PWA installée) restent disponibles.
+Puis relancer l’API. Sans ces variables, l’installation PWA, le partage et les notifications locales (onglet ouvert) restent disponibles, mais **aucun Push n’arrive sur le téléphone quand l’app est fermée**.
+
+En production (`wayize.gabomazone.com`), les clés doivent être dans le Secret Kubernetes / `/etc/wayize/api.env`, puis `migrate` et un redémarrage de l’API. Checklist VPS : [docs/premier-cluster.md](docs/premier-cluster.md) §10.7. Contrôle : `curl -fsS https://wayize.gabomazone.com/api/notifications/etat/` → `"push": true`. Android Chrome : PWA + permission. iPhone : iOS ≥ 16.4 et Wayizé sur l’écran d’accueil.
 
 Migration, depuis `backend`, avec les variables de l'API déjà posées :
 

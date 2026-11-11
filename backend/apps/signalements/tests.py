@@ -289,7 +289,24 @@ class MapSliceTests(TestCase):
         response = self.client.get("/api/sante/")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ok"])
+        self.assertIn("push", response.json())
         self.assertTrue(response["X-Request-Id"])
+
+    def test_push_etat_exposes_public_key_only_when_configured(self):
+        etat = self.client.get("/api/notifications/etat/")
+        self.assertEqual(etat.status_code, 200)
+        corps = etat.json()
+        self.assertIn("push", corps)
+        self.assertIn("vapid_public", corps)
+        refuse = self.post_json(
+            "/api/notifications/abonnement/",
+            {
+                "endpoint": "https://example.invalid/push",
+                "keys": {"p256dh": "x" * 40, "auth": "y" * 20},
+            },
+        )
+        if not corps["push"]:
+            self.assertEqual(refuse.status_code, 503)
 
     def test_author_can_move_the_point_without_moving_the_catalogue(self):
         from apps.lieux.models import Lieu

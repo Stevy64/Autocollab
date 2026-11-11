@@ -441,6 +441,8 @@ Le fichier de l’API change selon le stockage.
 
 **SQLite** — un processus, un fichier. Pas de `DATABASE_URL`.
 
+Les trois lignes `WAYIZE_VAPID_*` restent commentées ici. Sans elles, le téléphone n’a pas d’alerte système quand Wayizé est fermée. Après le premier démarrage réussi, suivez la section **10.7 Notifications téléphone (Web Push)** pour les générer et les coller dans ce fichier.
+
 ```bash
 sudo tee /etc/wayize/api.env >/dev/null <<EOF
 DJANGO_SETTINGS_MODULE=wayize_api.prod
@@ -448,6 +450,9 @@ DJANGO_SECRET_KEY=${API_KEY}
 WAYIZE_API_HOSTS=wayize-api,wayize-api.wayize.svc.cluster.local,127.0.0.1,localhost
 WAYIZE_SEED=0
 WAYIZE_SQLITE_PATH=/data/db.sqlite3
+# WAYIZE_VAPID_PUBLIC_KEY=
+# WAYIZE_VAPID_PRIVATE_KEY=
+# WAYIZE_VAPID_SUBJECT=mailto:contact@wayize.gabomazone.com
 EOF
 ```
 
@@ -460,6 +465,9 @@ DJANGO_SECRET_KEY=${API_KEY}
 WAYIZE_API_HOSTS=wayize-api,wayize-api.wayize.svc.cluster.local,127.0.0.1,localhost
 WAYIZE_SEED=0
 DATABASE_URL=postgresql://wayize:${APP_PW}@postgres.donnees.svc.cluster.local:5432/wayize?sslmode=disable
+# WAYIZE_VAPID_PUBLIC_KEY=
+# WAYIZE_VAPID_PRIVATE_KEY=
+# WAYIZE_VAPID_SUBJECT=mailto:contact@wayize.gabomazone.com
 EOF
 ```
 
@@ -893,6 +901,50 @@ kubectl -n wayize set image deployment/wayize-web \
 ```
 
 Sur le chemin Postgres, le conteneur `migrate` est dans le Job, pas dans le Deployment : la première commande `set image` n’a alors que `api=...`.
+
+### 10.7 Notifications téléphone (Web Push)
+
+Sans cette étape, le téléphone n’affiche une alerte que si Wayizé est ouverte. Pour une notification système (centre de notifications / barre d’état) **quand l’app est fermée**, l’API doit avoir une paire VAPID, le navigateur s’abonne, et chaque nouveau signalement envoie un Push.
+
+**Limites plateforme.** Android Chrome : installer la PWA ou autoriser le site HTTPS, puis Activer les notifications. iPhone / iPad : iOS 16.4 ou plus, Wayizé **ajoutée à l’écran d’accueil** (Safari → Partager → Sur l’écran d’accueil) ; le Push ne marche pas dans un onglet Safari seul.
+
+Sur le VPS, une seule fois (ne collez jamais la clé privée dans git ni dans le chat) :
+
+```bash
+# 1) Générer les clés (Node sur le VPS, ou depuis un PC puis coller)
+npx --yes web-push generate-vapid-keys
+# Notez Public Key et Private Key. Ou, depuis un clone :
+#   python3 deploy/generate_vapid_keys.py
+#   → lit deploy/vapid.local.env (fichier gitignoré)
+
+# 2) Les coller dans /etc/wayize/api.env (décommentez et remplacez)
+sudoedit /etc/wayize/api.env
+# WAYIZE_VAPID_PUBLIC_KEY=...clé publique...
+# WAYIZE_VAPID_PRIVATE_KEY=...clé privée...
+# WAYIZE_VAPID_SUBJECT=mailto:contact@wayize.gabomazone.com
+
+# 3) Recréer le Secret API et redémarrer (les autres variables restent dans le fichier)
+sudo k3s kubectl -n wayize delete secret wayize-api
+sudo k3s kubectl -n wayize create secret generic wayize-api --from-env-file=/etc/wayize/api.env
+kubectl -n wayize rollout restart deployment/wayize-api
+kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
+
+# 4) Migration si le pod n'a pas encore la table des abonnements
+kubectl -n wayize exec deploy/wayize-api -- python manage.py migrate --noinput
+# (chemin Postgres : lancez plutôt le Job wayize-migrate comme en 10.4)
+
+# 5) Vérifier — "push" doit être true
+curl -fsS https://wayize.gabomazone.com/api/notifications/etat/
+curl -fsS https://wayize.gabomazone.com/sante/
+```
+
+Sur le téléphone :
+
+1. Ouvrir `https://wayize.gabomazone.com/`, installer Wayizé (ou Sur l’écran d’accueil sur iPhone).
+2. Compte → Alertes → **Autoriser les notifications téléphone** → Accepter.
+3. Fermer complètement l’app, publier un signalement depuis un autre appareil (ou l’admin), et vérifier la notification système.
+
+Si `etat` répond `"push": false`, les clés ne sont pas dans le pod : `kubectl -n wayize exec deploy/wayize-api -- printenv | grep WAYIZE_VAPID` (la privée apparaît : ne la copiez nulle part). Si `push` est true mais rien n’arrive : réinstallez la PWA, réactivez les notifications, puis `kubectl -n wayize logs deploy/wayize-api | grep push`.
 
 ## 11. L’application suivante
 

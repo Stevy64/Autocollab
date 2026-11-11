@@ -1,15 +1,33 @@
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods
 
 from apps.http import erreur, lire_json, protege, reponse
 from apps.identite import cle_session
 from apps.journal import journal, request_id
 
-from .push import enregistrer, vapid_public
+from .push import enregistrer, pret, vapid_public
+
+
+@require_GET
+def etat(request):
+    """État public du Push. Pas de clé privée."""
+    publique = vapid_public()
+    return reponse(
+        {
+            "push": pret(),
+            "vapid_public": publique or None,
+        }
+    )
 
 
 @protege("signalements")
 @require_http_methods(["POST"])
 def abonnement(request):
+    if not pret():
+        return erreur(
+            "Les notifications téléphone ne sont pas configurées sur ce serveur "
+            "(clés VAPID absentes).",
+            status=503,
+        )
     data, message = lire_json(request)
     if data is None:
         return erreur(message)
