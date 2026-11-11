@@ -12,7 +12,7 @@ Vous n’avez pas besoin d’avoir déjà utilisé Kubernetes. Les mots qui revi
 
 k3s est le bon choix ici : c’est un Kubernetes complet en un seul programme, prévu pour une petite machine, et il amène déjà Traefik pour recevoir les sous-domaines.
 
-Lisez ce guide de haut en bas. Les étapes 1 à 7 préparent la machine, une seule fois. L’étape 8 crée le tiroir de Wayizé, l’étape 9 son nom de domaine, l’étape 10 l’installe. À l’étape 10.1, faites le choix A ou le choix B, puis continuez à l’étape 10.2. Ne revenez pas en arrière. L’étape 11 envoie vers le guide de l’application suivante. Chacun de ces guides a sa propre suite 1, 2, 3, et ne reprend pas les numéros de celui-ci.
+Lisez ce guide de haut en bas. Les étapes 1 à 7 préparent la machine, une seule fois. L’étape 8 crée le tiroir de Wayizé, l’étape 9 son nom de domaine, l’étape 10 l’installe. À l’étape 10.1 on **construit l’image sur le VPS** (pas de registre GHCR). Continuez ensuite à 10.2. Ne revenez pas en arrière. L’étape 11 envoie vers le guide de l’application suivante. Chacun de ces guides a sa propre suite 1, 2, 3, et ne reprend pas les numéros de celui-ci.
 
 Dans le terminal, on ne colle que le contenu d’un bloc de commandes (le cadre gris), puis on attend qu’il se termine. Les titres, les phrases et les lignes « Ça a marché si » ne sont pas des commandes. Si le shell répond `command not found` sur un mot français, ce mot a été collé par erreur : on l’ignore, on n’installe rien.
 
@@ -201,102 +201,117 @@ Deux façons de garder les données. Le reste (image, frontal, certificat, mise 
 
 Si vous restez sur un seul processus, suivez les blocs **SQLite** et sautez la section 10.2. Si vous voulez Postgres pour Wayizé, faites la section 10.2 avant les blocs **Postgres**. Les applications de l’étape 11 utilisent ce même Postgres : ne sautez la section 10.2 que si Wayizé reste seul sur ce VPS.
 
-### 10.1 Obtenir l’image
+### 10.1 Obtenir l’image (sur le VPS, sans registre)
 
-Faites l’un des deux choix, pas les deux. Notez la lettre : elle revient à l’étape 10.6.
+**Pas de GHCR.** On ne tire pas `ghcr.io/stevy64/wayize:…`. On construit l’image sur le VPS, on l’importe dans k3s, et les Deployments utilisent l’étiquette locale `wayize:local` avec `imagePullPolicy: Never`. Aucun jeton de registre, aucun `imagePullSecrets`.
 
-Le choix A dépose l’image sur GHCR. Les manifests plus bas disent alors `ghcr.io/stevy64/wayize:main` et `imagePullPolicy: Always`.
+Le fichier de construction est `deploy/Dockerfile.wayize` (utilisateur non root `app`, uid 10001). Docker (ou buildah) ne sert qu’à construire ; les pods restent ceux de k3s. L’image nginx des manifests ne change pas.
 
-Le choix B construit l’image sur le VPS. Dans les manifests des étapes 10.4 et 10.5, remplacez chaque `ghcr.io/stevy64/wayize:main` par `docker.io/library/wayize:1`, et chaque `imagePullPolicy: Always` par `imagePullPolicy: Never`. L’image nginx ne change pas.
+#### Construire et importer
 
-#### Choix A — GitHub Actions
-
-Le dépôt public peut construire l’image sur les runners gratuits `ubuntu-latest`, puis la déposer sur GHCR. Le VPS la télécharge. GitHub n’ouvre pas de session SSH et n’envoie pas de mot de passe.
-
-Deux fichiers d’exemple sont déjà dans le dépôt, pas dans le code de l’application :
-
-- `deploy/Dockerfile.wayize` — image non root (utilisateur `app`, uid 10001), sonde de santé ;
-- `deploy/wayize-image.yml` — le workflow. Les actions sont épinglées sur un commit. Le seul jeton est `GITHUB_TOKEN`, créé par GitHub pour le job. Il n’y a pas de secret à coller dans le fichier.
-
-Kubernetes n’utilise pas la ligne `HEALTHCHECK` du Dockerfile. Les sondes du Deployment, plus bas, sont le contrôle qui compte. La ligne sert si vous lancez le conteneur à la main.
-
-Pour que GitHub lance le workflow à chaque push sur `main` qui touche l’application :
-
-```bash
-sudo mkdir -p /srv/wayize
-sudo chown "$USER:$USER" /srv/wayize
-git clone https://github.com/Stevy64/Autocollab.git /srv/wayize
-cd /srv/wayize
-git config user.email "REMPLACER_PAR_EMAIL"
-git config user.name "$USER"
-mkdir -p .github/workflows
-cp deploy/wayize-image.yml .github/workflows/wayize-image.yml
-git add .github/workflows/wayize-image.yml
-git commit -m "Build the Wayize image on GHCR."
-git push origin main
-```
-
-`git config` ici ne concerne que ce clone. Le push part de votre dépôt GitHub, pas d’une session ouverte par Actions.
-
-Si `git push` demande un mot de passe, ce n’est pas celui du VPS : c’est un jeton GitHub à vous, créé sur le site (réglage du compte, jetons). Ne l’écrivez pas dans un fichier du dépôt.
-
-Ouvrez l’onglet Actions du dépôt. Le job `build` doit devenir vert. L’image s’appelle `ghcr.io/stevy64/wayize`. Deux étiquettes : `main`, et le SHA du commit (affiché dans le journal du job). Le SHA sert à revenir en arrière.
-
-Ça a marché si le job Actions est vert et si le journal dit que l’image a été poussée.
-
-GHCR laisse souvent le paquet privé, même pour un dépôt public. Pour ce dépôt public, le plus simple est de rendre le paquet public : sur GitHub, paquet `wayize`, réglage du paquet, visibilité publique. Le VPS le tire alors sans jeton.
-
-```bash
-sudo k3s ctr images pull ghcr.io/stevy64/wayize:main
-```
-
-Ça a marché si la commande se termine sans `unauthorized`.
-
-Si vous gardez le paquet privé : créez sur GitHub un jeton qui peut seulement lire les paquets (`read:packages`). Sur le VPS, pas dans git :
-
-```bash
-read -rs GHCR_TOKEN
-kubectl -n wayize create secret docker-registry ghcr \
-  --docker-server=ghcr.io \
-  --docker-username=Stevy64 \
-  --docker-password="$GHCR_TOKEN"
-unset GHCR_TOKEN
-```
-
-Ajoutez alors, sous `spec.template.spec` de chaque Deployment Wayizé :
-
-```yaml
-imagePullSecrets:
-  - name: ghcr
-```
-
-Les manifests plus bas supposent le paquet public. L’image est `ghcr.io/stevy64/wayize:main` et `imagePullPolicy: Always`, pour qu’une mise à jour télécharge de nouveau l’étiquette `main`.
-
-Passez à l’étape 10.2.
-
-#### Choix B — Construire sur le VPS
-
-Le VPS n’a pas de registre. On construit l’image sur place et k3s l’utilise sans aller la chercher sur Internet. Docker ne fait que la construction : les pods restent ceux de k3s.
-
-Si `/srv/wayize` existe déjà, ne clonez pas une seconde fois.
+Si `/srv/wayize` existe déjà, ne clonez pas une seconde fois. Le dépôt applicatif est [Stevy64/Wayize](https://github.com/Stevy64/Wayize).
 
 ```bash
 sudo apt install -y docker.io
 sudo mkdir -p /srv/wayize
 sudo chown "$USER:$USER" /srv/wayize
 if [ ! -d /srv/wayize/.git ]; then
-  git clone https://github.com/Stevy64/Autocollab.git /srv/wayize
+  git clone https://github.com/Stevy64/Wayize.git /srv/wayize
 fi
 cd /srv/wayize
 git pull --ff-only
-sudo docker build -f deploy/Dockerfile.wayize -t wayize:1 .
-sudo docker save wayize:1 | sudo k3s ctr images import -
+sudo docker build -f deploy/Dockerfile.wayize -t wayize:local .
+sudo docker save wayize:local | sudo k3s ctr images import -
 sudo k3s ctr images ls | grep wayize
 ```
 
-Ça a marché si `grep` affiche `docker.io/library/wayize:1`.
+Sans Docker, avec buildah :
 
-`Never` interdit à k3s d’interroger un registre : l’image doit déjà être dans `k3s ctr images ls`. Passez à l’étape 10.2.
+```bash
+sudo apt install -y buildah
+cd /srv/wayize
+sudo buildah bud -f deploy/Dockerfile.wayize -t docker.io/library/wayize:local .
+sudo buildah push docker.io/library/wayize:local docker-archive:/tmp/wayize-local.tar
+sudo k3s ctr images import /tmp/wayize-local.tar
+rm -f /tmp/wayize-local.tar
+sudo k3s ctr images ls | grep wayize
+```
+
+Ça a marché si `grep` affiche `docker.io/library/wayize:local` (ou un nom équivalent contenant `wayize:local`).
+
+Les manifests des étapes 10.4 et 10.5 utilisent déjà :
+
+```yaml
+image: docker.io/library/wayize:local
+imagePullPolicy: Never
+```
+
+`Never` interdit à k3s d’interroger Internet pour cette image : elle doit figurer dans `k3s ctr images ls` **avant** le démarrage des pods.
+
+Passez à l’étape 10.2.
+
+#### Bloqué maintenant : `ImagePullBackOff` sur `ghcr.io/stevy64/wayize:main`
+
+Si les pods affichent `ImagePullBackOff` / `ErrImagePull` et que `kubectl -n wayize describe pod …` cite `ghcr.io/stevy64/wayize:main`, le cluster essaie encore le registre. On arrête ça : construire en local, importer, puis **forcer** les Deployments (et le Job migrate s’il existe) vers `wayize:local`.
+
+Collez ce bloc **tel quel** sur le VPS (SSH) :
+
+```bash
+cd /srv/wayize
+git pull --ff-only
+sudo apt install -y docker.io
+sudo docker build -f deploy/Dockerfile.wayize -t wayize:local .
+sudo docker save wayize:local | sudo k3s ctr images import -
+sudo k3s ctr images ls | grep wayize
+
+# API (conteneur api ; + migrate si le Deployment SQLite l’embarque)
+kubectl -n wayize set image deployment/wayize-api \
+  api=docker.io/library/wayize:local \
+  migrate=docker.io/library/wayize:local
+kubectl -n wayize patch deployment wayize-api --type=json -p='[
+  {"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"},
+  {"op":"replace","path":"/spec/template/spec/initContainers/0/imagePullPolicy","value":"Never"}
+]' 2>/dev/null || kubectl -n wayize patch deployment wayize-api --type=json -p='[
+  {"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"}
+]'
+
+# Frontal (static + gunicorn)
+kubectl -n wayize set image deployment/wayize-web \
+  static=docker.io/library/wayize:local \
+  gunicorn=docker.io/library/wayize:local
+kubectl -n wayize patch deployment wayize-web --type=json -p='[
+  {"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Never"},
+  {"op":"replace","path":"/spec/template/spec/containers/1/imagePullPolicy","value":"Never"}
+]'
+
+# Job migrate Postgres (s’il existe) : à relancer avec la bonne image
+if kubectl -n wayize get job wayize-migrate >/dev/null 2>&1; then
+  kubectl -n wayize delete job wayize-migrate --ignore-not-found
+fi
+
+kubectl -n wayize delete pods -l app=wayize-api --force --grace-period=0 2>/dev/null || true
+kubectl -n wayize delete pods -l app=wayize-web --force --grace-period=0 2>/dev/null || true
+kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
+kubectl -n wayize rollout status deployment/wayize-web --timeout=180s
+kubectl -n wayize get pods
+```
+
+Si le patch `initContainers` échoue parce qu’il n’y en a pas (chemin Postgres), c’est normal : le second `patch` (conteneur seul) suffit pour l’API.
+
+Ça a marché si `get pods` montre `Running` / `1/1` (ou `2/2` pour le web) **sans** `ImagePullBackOff`, et si :
+
+```bash
+kubectl -n wayize get deploy wayize-api wayize-web -o wide
+kubectl -n wayize get deploy -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .spec.template.spec.containers[*]}{.image}{" "}{.imagePullPolicy}{"\n"}{end}{end}'
+```
+
+affiche `docker.io/library/wayize:local` et `Never` (plus de `ghcr.io`).
+
+Retirez aussi un éventuel secret de registre devenu inutile :
+
+```bash
+kubectl -n wayize delete secret ghcr --ignore-not-found
+```
 
 ### 10.2 Postgres du cluster
 
@@ -529,8 +544,8 @@ spec:
         fsGroup: 10001
       containers:
         - name: api
-          image: ghcr.io/stevy64/wayize:main
-          imagePullPolicy: Always
+          image: docker.io/library/wayize:local
+          imagePullPolicy: Never
           workingDir: /app/backend
           command: ["gunicorn", "wayize_api.wsgi:application", "--bind", "0.0.0.0:8648", "--workers", "1"]
           envFrom:
@@ -562,8 +577,8 @@ spec:
               mountPath: /data
       initContainers:
         - name: migrate
-          image: ghcr.io/stevy64/wayize:main
-          imagePullPolicy: Always
+          image: docker.io/library/wayize:local
+          imagePullPolicy: Never
           workingDir: /app/backend
           command: ["python", "manage.py", "migrate", "--noinput"]
           envFrom:
@@ -615,8 +630,8 @@ spec:
       restartPolicy: Never
       containers:
         - name: migrate
-          image: ghcr.io/stevy64/wayize:main
-          imagePullPolicy: Always
+          image: docker.io/library/wayize:local
+          imagePullPolicy: Never
           workingDir: /app/backend
           command: ["python", "manage.py", "migrate", "--noinput"]
           envFrom:
@@ -644,8 +659,8 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/stevy64/wayize:main
-          imagePullPolicy: Always
+          image: docker.io/library/wayize:local
+          imagePullPolicy: Never
           workingDir: /app/backend
           command: ["gunicorn", "wayize_api.wsgi:application", "--bind", "0.0.0.0:8648", "--workers", "1"]
           envFrom:
@@ -741,8 +756,8 @@ spec:
     spec:
       initContainers:
         - name: static
-          image: ghcr.io/stevy64/wayize:main
-          imagePullPolicy: Always
+          image: docker.io/library/wayize:local
+          imagePullPolicy: Never
           command: ["sh", "-c", "cp -R /app/frontend/staticfiles/. /static/ && find /static -mindepth 1 -exec chmod a+rX {} +"]
           securityContext:
             runAsNonRoot: true
@@ -753,8 +768,8 @@ spec:
               mountPath: /static
       containers:
         - name: gunicorn
-          image: ghcr.io/stevy64/wayize:main
-          imagePullPolicy: Always
+          image: docker.io/library/wayize:local
+          imagePullPolicy: Never
           workingDir: /app/frontend
           command: ["gunicorn", "wayize_web.wsgi:application", "--bind", "127.0.0.1:8647", "--workers", "1"]
           envFrom:
@@ -850,59 +865,36 @@ Ce sont les mêmes lignes JSON que dans le README. `X-Request-Id` relie le front
 
 ### 10.6 Mettre à jour
 
-On refait seulement cette étape à chaque publication. Les étapes 1 à 10.5 ne se rejouent pas. Le Secret, la base et les disques restent en place.
-
-La mise à jour suit la lettre notée à l’étape 10.1.
-
-#### Si vous aviez choisi A
-
-GitHub construit l’image. Le VPS va la chercher. Personne ne se connecte en SSH depuis Actions, et aucun mot de passe ne voyage dans le workflow.
-
-Quand le job est vert, sur le VPS :
-
-```bash
-sudo tee /usr/local/bin/wayize-deploy >/dev/null <<'EOF'
-#!/bin/sh
-set -eu
-kubectl -n wayize rollout restart deployment/wayize-api
-kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
-kubectl -n wayize rollout restart deployment/wayize-web
-kubectl -n wayize rollout status deployment/wayize-web --timeout=180s
-EOF
-sudo chmod 755 /usr/local/bin/wayize-deploy
-wayize-deploy
-```
-
-`imagePullPolicy: Always` fait retélécharger l’étiquette `main` au redémarrage des pods.
-
-#### Si vous aviez choisi B
-
-On reconstruit l’étiquette `wayize:1` et on la réimporte, puis on redémarre les pods. `imagePullPolicy: Never` prend alors l’image qui vient d’être importée.
+On refait seulement cette étape à chaque publication. Les étapes 1 à 10.5 ne se rejouent pas. Le Secret, la base et les disques restent en place. **Toujours sans GHCR** : on reconstruit `wayize:local` sur le VPS, on réimporte dans k3s, on redémarre les pods.
 
 ```bash
 cd /srv/wayize
 git pull --ff-only
-sudo docker build -f deploy/Dockerfile.wayize -t wayize:1 .
-sudo docker save wayize:1 | sudo k3s ctr images import -
+sudo docker build -f deploy/Dockerfile.wayize -t wayize:local .
+sudo docker save wayize:local | sudo k3s ctr images import -
 kubectl -n wayize rollout restart deployment/wayize-api deployment/wayize-web
 kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
 kubectl -n wayize rollout status deployment/wayize-web --timeout=180s
+curl -fsS https://wayize.gabomazone.com/sante/
 ```
 
-Ça a marché si les deux `rollout` se terminent par `successfully rolled out`, puis si `curl -fsS https://wayize.gabomazone.com/sante/` répond encore `"api": true`.
+Ça a marché si les deux `rollout` se terminent par `successfully rolled out`, et si `curl` répond encore `"api": true`.
 
-Pour revenir au commit d’avant, remplacez `main` par le SHA affiché dans Actions (les deux conteneurs qui utilisent l’image Wayizé) :
+Pour revenir à un commit précis :
 
 ```bash
-kubectl -n wayize set image deployment/wayize-api \
-  api=ghcr.io/stevy64/wayize:SHA \
-  migrate=ghcr.io/stevy64/wayize:SHA
-kubectl -n wayize set image deployment/wayize-web \
-  static=ghcr.io/stevy64/wayize:SHA \
-  gunicorn=ghcr.io/stevy64/wayize:SHA
+cd /srv/wayize
+git fetch origin
+git checkout COMMITHASH
+sudo docker build -f deploy/Dockerfile.wayize -t wayize:local .
+sudo docker save wayize:local | sudo k3s ctr images import -
+kubectl -n wayize rollout restart deployment/wayize-api deployment/wayize-web
+kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
+kubectl -n wayize rollout status deployment/wayize-web --timeout=180s
+git checkout main
 ```
 
-Sur le chemin Postgres, le conteneur `migrate` est dans le Job, pas dans le Deployment : la première commande `set image` n’a alors que `api=...`.
+Si un Job `wayize-migrate` (Postgres) doit refaire la migration après une mise à jour de schéma, recréez-le comme à l’étape 10.4 une fois la nouvelle image importée.
 
 ### 10.7 Alertes téléphone en prod
 
@@ -1035,4 +1027,4 @@ Le cluster est en place. On ne refait pas les étapes 1 à 7, ni le Postgres de 
 | Fallaman | `fallaman.gabomazone.com` | `Fallaman/docs/ovh-cluster.md` du dépôt Fallaman-Web |
 | Gaboma Hub | `hub.gabomazone.com` | `docs/ovh-cluster.md` du dépôt Gaboma-Hub |
 
-Dans chacun : un namespace, un nom de domaine, une base dans le Postgres déjà là, l’image (choix A ou choix B, le même geste qu’à l’étape 10.1), les variables du projet, puis le lancement. Le Secret et le disque de Wayizé ne sont pas réutilisés. Une API interne, comme celle de Wayizé, reste sans Ingress.
+Dans chacun : un namespace, un nom de domaine, une base dans le Postgres déjà là, l’image (construites sur le VPS comme à l’étape 10.1, sans GHCR), les variables du projet, puis le lancement. Le Secret et le disque de Wayizé ne sont pas réutilisés. Une API interne, comme celle de Wayizé, reste sans Ingress.
