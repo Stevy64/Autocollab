@@ -81,7 +81,7 @@ const FAQ = [
   {
     id: "compte",
     q: "Faut-il un compte ?",
-    a: "Non. La carte et les signalements restent ouverts sans compte. Un compte confirme son adresse email. Premium ajoute le trajet domicile–travail, les listes, les alertes, le GPS, le mode conduite et un pseudo sur les précisions.",
+    a: "Non. La carte, les signalements et les notifications téléphone (Web Push) restent ouverts sans compte. Un compte confirme son adresse email. Premium ajoute le trajet domicile–travail, les listes, les alertes à l'approche, le GPS, le mode conduite et un pseudo sur les précisions.",
   },
   {
     id: "vite",
@@ -111,7 +111,7 @@ const FAQ = [
   {
     id: "premium",
     q: "Que comprend Premium, et est-ce payant ?",
-    a: "Listes de quartiers, trajet, alertes, GPS à l'approche, heures de vigilance, mode conduite et silence de deux heures. Sur cette version, activer Premium enregistre le droit sans débit : le paiement mobile money n'est pas branché.",
+    a: "Listes de quartiers, trajet, alertes à l'approche, GPS, heures de vigilance, mode conduite et silence de deux heures. Les notifications téléphone sur nouveau signalement sont gratuites pour tout le monde (bouton Autoriser sur la carte). Sur cette version, activer Premium enregistre le droit sans débit : le paiement mobile money n'est pas branché.",
   },
   {
     id: "install",
@@ -1152,6 +1152,42 @@ function boutonSignaler() {
   return `<button type="button" class="btn btn-primary btn-compact btn-signaler" data-action="compose">${uiIcon("alarm")} Signaler</button>`;
 }
 
+function invitePushHtml(options) {
+  const compact = options && options.compact;
+  if (!("Notification" in window)) return "";
+  const notif = etatNotifications();
+  const pushServeur = reglagesCarte().push === true || Boolean(reglagesCarte().vapid_public);
+  if (notif === "unsupported") return "";
+  if (notif === "granted" && pushServeur) {
+    if (compact) return "";
+    return `
+      <div class="push-invite is-ok" role="status">
+        <span>${uiIcon("bell", 18)} Notifications téléphone actives</span>
+        <small>Sans compte. Alerte système quand un signalement sort, même si Wayizé est fermée.</small>
+      </div>`;
+  }
+  const bloque = notif === "denied";
+  const libelle = bloque
+    ? "Notifications bloquées"
+    : pushServeur
+      ? "Autoriser les notifications"
+      : "Notifications téléphone";
+  const aide = bloque
+    ? "Débloquez Wayizé dans les paramètres du navigateur."
+    : pushServeur
+      ? (estIOSInstall() && !dejaInstallee()
+        ? "Sur iPhone : ajoutez Wayizé à l’écran d’accueil, puis Autoriser."
+        : "Sans compte. Une alerte système à chaque nouveau signalement.")
+      : "Le serveur n’a pas encore les clés VAPID.";
+  return `
+    <div class="push-invite">
+      <button type="button" class="silence-row" data-action="notifications" ${bloque || !pushServeur ? "disabled" : ""}>
+        <span><strong>${uiIcon("bell", 16)} ${esc(libelle)}</strong><small>${esc(aide)}</small></span>
+        <em>${bloque ? "Réglages" : "Autoriser"}</em>
+      </button>
+    </div>`;
+}
+
 function renderFeed() {
   const items = visibleReports();
   const liste = listeActive();
@@ -1172,6 +1208,7 @@ function renderFeed() {
         ${bandeauSuivi(suivi)}
       </div>
       ${offlineNote()}
+      ${invitePushHtml()}
       <div class="chips" role="toolbar" aria-label="Filtrer les signalements">
         ${FILTERS.map((chip) => chipHtml(chip, `data-action="filter" data-filter="${chip.id}" aria-pressed="${state.filter === chip.id ? "true" : "false"}"`)).join("")}
       </div>
@@ -1544,11 +1581,14 @@ async function lireVapidPublic() {
   if (cle) return cle;
   try {
     const data = await api("/api/notifications/etat/");
-    if (data && data.vapid_public) {
+    if (data) {
       if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
-      boot.reglages.vapid_public = data.vapid_public;
       boot.reglages.push = !!data.push;
-      return String(data.vapid_public).trim();
+      if (typeof data.abonnements === "number") boot.reglages.abonnements = data.abonnements;
+      if (data.vapid_public) {
+        boot.reglages.vapid_public = data.vapid_public;
+        return String(data.vapid_public).trim();
+      }
     }
   } catch (error) {
     // L'API peut être temporairement indisponible.
@@ -1584,6 +1624,9 @@ async function abonnerPush(options) {
     return { ok: false, raison: "vapid" };
   }
   try {
+    if ("serviceWorker" in navigator) {
+      await navigator.serviceWorker.register("/sw.js");
+    }
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     let cleConnue = "";
@@ -1598,12 +1641,21 @@ async function abonnerPush(options) {
         applicationServerKey: urlBase64VersUint8Array(cle),
       });
     }
-    await api("/api/notifications/abonnement/", {
+    const json = sub.toJSON();
+    if (!json || !json.endpoint || !json.keys || !json.keys.p256dh || !json.keys.auth) {
+      throw new Error("Abonnement Push incomplet.");
+    }
+    const enregistre = await api("/api/notifications/abonnement/", {
       method: "POST",
-      body: JSON.stringify(sub.toJSON()),
+      body: JSON.stringify(json),
     });
     try { localStorage.setItem("wayize.vapid.public", cle); } catch (error) { /* ignore */ }
-    return { ok: true };
+    if (enregistre && typeof enregistre.abonnements === "number") {
+      if (!boot.reglages || typeof boot.reglages !== "object") boot.reglages = {};
+      boot.reglages.push = true;
+      boot.reglages.abonnements = enregistre.abonnements;
+    }
+    return { ok: true, abonnements: enregistre && enregistre.abonnements };
   } catch (error) {
     if (!silencieux) {
       toast(messageFrom(error, "L'abonnement aux notifications a échoué."));
@@ -1900,6 +1952,7 @@ function lienCourriel() {
 
 function renderCompteInvite() {
   const mode = state.compteMode;
+  const invitePush = invitePushHtml();
   if (mode === "attente") {
     return `
       ${enteteCompte("Compte", "Confirmez votre adresse.")}
@@ -1939,6 +1992,7 @@ function renderCompteInvite() {
   const inscription = mode === "inscription";
   return `
     ${enteteCompte("Compte", "La carte reste ouverte sans compte.")}
+    ${invitePush}
     <form id="compte-form" class="auth" novalidate>
       <div class="auth-switch" role="tablist" aria-label="Connexion ou inscription">
         <button type="button" role="tab" data-action="auth-mode" data-mode="connexion" aria-selected="${inscription ? "false" : "true"}">Connexion</button>
@@ -1991,9 +2045,12 @@ function panneauAlertes(reglages) {
       : notif === "unsupported"
         ? "Notifications non disponibles ici"
         : "Autoriser les notifications téléphone";
+  const aboCompte = Number(reglagesCarte().abonnements || 0);
   const notifAide = notif === "granted"
     ? (pushServeur
-      ? "Alerte système même si Wayizé est fermée (Web Push)."
+      ? (aboCompte > 0
+        ? `Alerte système même si Wayizé est fermée (${aboCompte} téléphone${aboCompte > 1 ? "s" : ""} abonné${aboCompte > 1 ? "s" : ""}).`
+        : "Alerte système même si Wayizé est fermée (Web Push). Touchez Autoriser pour enregistrer ce téléphone.")
       : "Le serveur n'a pas les clés VAPID : seules les alertes à l'écran marchent.")
     : "Pas un compteur dans l’app : une alerte native du téléphone. Sur iPhone, Wayizé doit être sur l’écran d’accueil.";
   return `
@@ -2103,19 +2160,20 @@ function renderCompte() {
     ${premium ? `<div class="segments" role="tablist" aria-label="Réglages Premium">${onglet("veille", "Veille")}${onglet("alertes", "Alertes")}${onglet("profil", "Profil")}</div>` : ""}
     <div class="compose">
       ${premium ? "" : `
+        ${invitePushHtml()}
         <section class="offre">
           <h2>Personnaliser, ${esc(libellePrix())}</h2>
           <ul>
             <li>Briefing du trajet domicile–travail, incidents sur le chemin</li>
             <li>Listes de quartiers à suivre</li>
-            <li>Alertes visuelles et sonores, filtrées par type</li>
+            <li>Alertes visuelles et sonores à l’approche, filtrées par type</li>
             <li>GPS : position sur la carte et alerte à l’approche</li>
             <li>Heures de vigilance, le matin et le soir</li>
             <li>Mode conduite, texte plus grand</li>
             <li>Silence de deux heures</li>
             <li>Pseudo signé sur les précisions, ou commentaire anonyme</li>
           </ul>
-          <p class="muted">Le paiement mobile money n’est pas branché. Activer Premium ici enregistre le droit sur ce serveur, sans débit.</p>
+          <p class="muted">Les notifications téléphone sur nouveau signalement restent gratuites sans Premium. Le paiement mobile money n’est pas branché. Activer Premium ici enregistre le droit sur ce serveur, sans débit.</p>
           ${state.compteErreur ? `<p class="field-error">${esc(state.compteErreur)}</p>` : ""}
           <button type="button" class="btn btn-primary btn-block offre-activer" data-action="premium" ${state.compteEnCours ? "disabled" : ""}>${uiIcon("star")} Activer Premium</button>
         </section>

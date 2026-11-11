@@ -907,6 +907,20 @@ Si un Job `wayize-migrate` (Postgres) doit refaire la migration après une mise 
 
 Cette section se fait **après** que `https://wayize.gabomazone.com/sante/` répond avec `"api": true` (fin de 10.5). Une seule fois. On reste sur le VPS, en SSH, sauf pour le test téléphone à la fin.
 
+**Après un correctif Push (image locale).** Sur le VPS, depuis le clone à jour (`git pull` sur `main`) :
+
+```bash
+cd /srv/wayize   # ou le chemin du clone
+sudo docker build -f deploy/Dockerfile.wayize -t wayize:local .
+sudo docker save wayize:local | sudo k3s ctr images import -
+kubectl -n wayize rollout restart deployment/wayize-api deployment/wayize-web
+kubectl -n wayize rollout status deployment/wayize-api --timeout=180s
+kubectl -n wayize rollout status deployment/wayize-web --timeout=180s
+curl -fsS https://wayize.gabomazone.com/api/notifications/etat/
+```
+
+Détail A→B→C : [10.1](#101-image-locale-sur-le-vps-sans-ghcr) et [10.6](#106-mettre-à-jour). Pas de GHCR.
+
 Sans ces clés, le téléphone n’alerte que si Wayizé est ouverte à l’écran. Avec elles, une notification système peut arriver **même si l’app est fermée** (Web Push).
 
 | Où | Quoi |
@@ -994,14 +1008,15 @@ kubectl -n wayize wait --for=condition=complete job/wayize-migrate --timeout=180
 
 Ça a marché si la commande se termine sans erreur rouge.
 
-#### Étape E — Contrôle `"push": true`
+#### Étape E — Contrôle `"push": true` et compteur d’abonnements
 
 ```bash
 curl -fsS https://wayize.gabomazone.com/api/notifications/etat/
 curl -fsS https://wayize.gabomazone.com/sante/
+curl -fsS https://wayize.gabomazone.com/api/sante/
 ```
 
-Ça a marché si la première réponse contient `"push": true` (et une `vapid_public` non vide). La seconde doit aussi montrer `"push": true`.
+Ça a marché si la première réponse contient `"push": true`, une `vapid_public` non vide, et `"abonnements": …` (nombre entier, souvent `0` avant le premier téléphone). `/sante/` et `/api/sante/` doivent aussi montrer `"push": true` ; `/api/sante/` expose aussi `abonnements`.
 
 Si vous lisez `"push": false` : les clés ne sont pas arrivées dans le pod. Vérifiez le fichier, recréez le Secret (étape C), puis :
 
@@ -1013,15 +1028,63 @@ kubectl -n wayize exec deploy/wayize-api -- printenv | grep WAYIZE_VAPID
 
 #### Étape F — Téléphone : installer, autoriser, tester
 
-1. Ouvrez `https://wayize.gabomazone.com/` sur le téléphone.
-2. **Installer** Wayizé (bouton Installer, ou sur iPhone : Partager → Sur l’écran d’accueil). Rouvrez l’icône installée.
-3. Compte → panneau **Alertes** → **Autoriser les notifications téléphone** → Accepter dans la boîte du système.
-4. Fermez complètement Wayizé (pas seulement un onglet en arrière-plan).
-5. Depuis un autre appareil (ou l’admin), publiez un signalement. Le téléphone doit montrer une notification système (centre de notifications / barre d’état), pas seulement un toast dans l’app.
+1. Ouvrez `https://wayize.gabomazone.com/` sur le téléphone (**sans compte** : la session anonyme suffit).
+2. **Installer** Wayizé (bouton Installer, ou sur iPhone : Partager → Sur l’écran d’accueil). Rouvrez l’icône installée — un simple onglet Safari **ne reçoit pas** le Push.
+3. Sur la **carte** (liste « En ce moment »), touchez **Autoriser les notifications** → Accepter dans la boîte du système. Pas besoin d’ouvrir Compte ni Premium. Android Chrome : site HTTPS ou PWA + permission suffisent.
+4. Vérifiez que l’abonnement est en base (sinon `push.skip` avec `aucun_abonnement`) :
+
+```bash
+curl -fsS https://wayize.gabomazone.com/api/notifications/etat/
+# "abonnements" doit passer à 1 (ou plus) après Autoriser
+kubectl -n wayize logs deploy/wayize-api --tail=80 | grep push
+# chercher push.subscribed
+```
+
+5. Fermez complètement Wayizé (pas seulement un onglet en arrière-plan).
+6. **Test Push admin** (compte admin, jeton `X-Wayize-Compte` après connexion admin) :
+
+```bash
+# Compteur + aperçu (admin)
+curl -fsS -H "X-Wayize-Compte: VOTRE_JETON" \
+  https://wayize.gabomazone.com/api/notifications/admin/
+
+# Envoi d'essai à tous les téléphones abonnés
+curl -fsS -X POST -H "Content-Type: application/json" \
+  -H "X-Wayize-Compte: VOTRE_JETON" \
+  -d '{"corps":"Test Push Wayizé"}' \
+  https://wayize.gabomazone.com/api/notifications/admin/test/
+```
+
+7. Sinon, depuis un autre appareil (ou l’admin), publiez un signalement. Le téléphone doit montrer une notification système (centre de notifications / barre d’état), pas seulement un toast dans l’app.
+
+```bash
+# Pendant / juste après la création d'un signalement :
+kubectl -n wayize logs deploy/wayize-api --tail=120 | grep -E 'signalement.created|push\.'
+# OK : push.sent avec count>=1
+# KO : push.skip (aucun_abonnement / vapid) ou push.error / push.expired (404/410 → abo supprimé)
+```
+
+Compter les abonnements dans le pod (SQLite) :
+
+```bash
+kubectl -n wayize exec deploy/wayize-api -- python -c \
+  "import django,os; os.environ.setdefault('DJANGO_SETTINGS_MODULE','wayize_api.settings'); django.setup(); from apps.signalements.models import AbonnementPush; print(AbonnementPush.objects.count())"
+```
 
 Ça a marché si la notification système apparaît alors que Wayizé est fermée.
 
-Si `"push": true` mais rien n’arrive : réinstallez la PWA, refaites l’autorisation, puis regardez `kubectl -n wayize logs deploy/wayize-api | grep push` (événements `push.subscribed` / `push.sent` / `push.error`).
+#### Dépannage — `"push": true` mais aucune alerte OS
+
+| Symptôme | Cause fréquente | Contrôle |
+| --- | --- | --- |
+| `etat` OK, `abonnements: 0` | Autoriser n’a pas enregistré l’endpoint (iOS hors PWA, SW absent, proxy `/api/notifications/` en échec) | Logs `push.subscribed` ; `curl …/etat/` après Autoriser |
+| `abonnements >= 1` mais pas d’alerte | Envoi cassé côté API (ex. ancien bug `vapid_public_key` → TypeError) | `kubectl … logs … \| grep push.error` ; admin `/test/` |
+| `push.expired` / 410 | Endpoint FCM/Apple expiré | Refaire Autoriser sur le téléphone |
+| iPhone onglet Safari | Push iOS seulement en PWA écran d’accueil (16.4+) | Installer puis rouvrir l’icône |
+| Android Chrome | Permission refusée ou site non HTTPS | Paramètres site → Notifications |
+| Toast in-app seulement | Alerte locale (`showNotification` depuis l’app ouverte), pas le Push serveur | Fermer l’app puis test admin / nouveau signalement |
+
+Si le proxy frontal coupe `/api/notifications/` : `curl` sur `/api/notifications/etat/` doit répondre JSON (pas 404 HTML). Le frontal proxye `/api/*` vers l’API ; CORS navigateur n’est pas requis pour ce chemin same-origin.
 
 ## 11. L’application suivante
 

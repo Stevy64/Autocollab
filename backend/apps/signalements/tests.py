@@ -298,6 +298,7 @@ class MapSliceTests(TestCase):
         corps = etat.json()
         self.assertIn("push", corps)
         self.assertIn("vapid_public", corps)
+        self.assertIn("abonnements", corps)
         refuse = self.post_json(
             "/api/notifications/abonnement/",
             {
@@ -307,6 +308,86 @@ class MapSliceTests(TestCase):
         )
         if not corps["push"]:
             self.assertEqual(refuse.status_code, 503)
+
+    def test_push_send_does_not_pass_vapid_public_key(self):
+        """Régression : pywebpush refuse vapid_public_key (TypeError → aucun OS push)."""
+        import os
+        from unittest import mock
+
+        from django.utils import timezone as tz
+
+        from apps.comptes.models import Compte
+        from apps.comptes.secrets import chiffrer, nouveau_jeton
+        from apps.signalements.models import AbonnementPush
+        from apps.signalements.push import envoyer_a_tous
+
+        os.environ["WAYIZE_VAPID_PUBLIC_KEY"] = "BPpublicfakekeyforunittests0123456789ABCDE"
+        os.environ["WAYIZE_VAPID_PRIVATE_KEY"] = "privatefakekeyforunittests0123456789"
+        self.addCleanup(lambda: os.environ.pop("WAYIZE_VAPID_PUBLIC_KEY", None))
+        self.addCleanup(lambda: os.environ.pop("WAYIZE_VAPID_PRIVATE_KEY", None))
+
+        AbonnementPush.objects.create(
+            endpoint="https://fcm.googleapis.com/fcm/send/test-endpoint",
+            cle_p256dh="x" * 40,
+            cle_auth="y" * 20,
+            session_cle=CLE,
+        )
+        etat = self.client.get("/api/notifications/etat/")
+        self.assertTrue(etat.json()["push"])
+        self.assertEqual(etat.json()["abonnements"], 1)
+        sante = self.client.get("/api/sante/")
+        self.assertEqual(sante.json().get("abonnements"), 1)
+
+        abo = self.post_json(
+            "/api/notifications/abonnement/",
+            {
+                "endpoint": "https://fcm.googleapis.com/fcm/send/test-endpoint",
+                "keys": {"p256dh": "x" * 40, "auth": "y" * 20},
+            },
+        )
+        self.assertEqual(abo.status_code, 200, abo.content)
+        self.assertTrue(abo.json()["ok"])
+        self.assertEqual(abo.json()["abonnements"], 1)
+
+        vus = []
+
+        def faux_webpush(**kwargs):
+            vus.append(kwargs)
+            if "vapid_public_key" in kwargs:
+                raise TypeError("webpush() got an unexpected keyword argument 'vapid_public_key'")
+
+        with mock.patch("pywebpush.webpush", side_effect=faux_webpush):
+            resultat = envoyer_a_tous("Wayizé", "Test", url="/", tag="wayize-test")
+        self.assertEqual(resultat["envoyes"], 1)
+        self.assertEqual(resultat["echecs"], 0)
+        self.assertEqual(len(vus), 1)
+        self.assertNotIn("vapid_public_key", vus[0])
+        self.assertIn("vapid_private_key", vus[0])
+        self.assertIn("vapid_claims", vus[0])
+
+        Compte.objects.create(
+            email="admin@wayize.ga",
+            secret=chiffrer("libreville"),
+            jeton=nouveau_jeton(),
+            est_admin=True,
+            confirme_le=tz.now(),
+        )
+        jeton = Compte.objects.get(email="admin@wayize.ga").jeton
+        with mock.patch("pywebpush.webpush", side_effect=faux_webpush):
+            test = self.client.post(
+                "/api/notifications/admin/test/",
+                data=json.dumps({"corps": "Ping test"}),
+                content_type="application/json",
+                HTTP_X_WAYIZE_COMPTE=jeton,
+            )
+        self.assertEqual(test.status_code, 200, test.content)
+        self.assertTrue(test.json()["ok"])
+        self.assertEqual(test.json()["envoyes"], 1)
+        liste = self.client.get("/api/notifications/admin/", HTTP_X_WAYIZE_COMPTE=jeton)
+        self.assertEqual(liste.status_code, 200)
+        self.assertEqual(liste.json()["abonnements"], 1)
+        refuse = self.client.get("/api/notifications/admin/")
+        self.assertEqual(refuse.status_code, 401)
 
     def test_author_can_move_the_point_without_moving_the_catalogue(self):
         from apps.lieux.models import Lieu

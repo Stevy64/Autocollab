@@ -118,10 +118,11 @@ def _logo_url(reglage):
 
 def publics():
     """Ce que la carte peut afficher, sans les plafonds internes."""
-    from apps.signalements.push import pret, vapid_public
+    from apps.signalements.push import nombre_abonnements, pret, vapid_public
 
     lu = lire()
     vapid = vapid_public()
+    pret_ok = pret()
     corps = {
         "prix_premium": lu["prix_premium"],
         "fond_defaut": lu["fond_defaut"],
@@ -129,7 +130,8 @@ def publics():
         "lien_android": lu["lien_android"],
         "lien_apple": lu["lien_apple"],
         "logo": lu["logo"],
-        "push": pret(),
+        "push": pret_ok,
+        "abonnements": nombre_abonnements() if pret_ok else 0,
     }
     if vapid:
         corps["vapid_public"] = vapid

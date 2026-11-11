@@ -202,9 +202,10 @@ sudoedit /etc/wayize/api.env   # WAYIZE_VAPID_PUBLIC_KEY, WAYIZE_VAPID_PRIVATE_K
 sudo -u wayize bash -lc 'set -a; source /etc/wayize/api.env; set +a; cd /srv/wayize/backend && /srv/wayize/.venv/bin/python manage.py migrate'
 sudo systemctl restart wayize-api
 curl -fsS https://wayize.gabomazone.com/api/notifications/etat/
+# attendu : "push": true, "abonnements": N
 ```
 
-`"push": true` confirme la config. Sur le téléphone : installer la PWA (écran d’accueil sur iOS), Compte → Alertes → Autoriser. Détail cluster : [premier-cluster.md](premier-cluster.md) §10.7.
+`"push": true` confirme la config. Après Autoriser sur le téléphone, `abonnements` doit monter. Test admin : `POST /api/notifications/admin/test/` avec `X-Wayize-Compte`. Sur le téléphone : installer la PWA (écran d’accueil sur iOS), Compte → Alertes → Autoriser. Détail et dépannage : [premier-cluster.md](premier-cluster.md) §10.7.
 
 ## Mettre à jour
 

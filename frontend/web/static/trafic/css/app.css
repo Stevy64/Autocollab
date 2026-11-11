@@ -1815,6 +1815,47 @@ body.sheet-covers .fonds {
   border-radius: 999px;
   background: var(--soft);
 }
+.push-invite {
+  margin: 10px 0 4px;
+  padding: 0 2px;
+}
+.push-invite .silence-row {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 14px;
+  box-shadow: var(--shadow);
+}
+.push-invite .silence-row:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+.push-invite .silence-row strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.push-invite.is-ok {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--soft);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.push-invite.is-ok small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.push-invite.is-ok span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 .heures-bloc { padding: 4px 0 8px; }
 .heures-ligne { display: flex; gap: 8px; }
 .heures-ligne .field { flex: 1; min-width: 0; }
